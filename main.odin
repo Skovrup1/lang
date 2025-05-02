@@ -1,13 +1,15 @@
 package main
 
-import "token"
+import tok "parser/tokenizer"
+import par "parser"
+import "tacky"
 
 import "core:fmt"
 import "core:os"
 import "core:unicode/utf8"
 
 main :: proc() {
-    handle, open_err := os.open("test/main.c")
+    handle, open_err := os.open("tests/unary_expr.lang")
     defer os.close(handle);
 
     if open_err != os.ERROR_NONE {
@@ -22,11 +24,31 @@ main :: proc() {
 
     fmt.print(transmute(string) buf)
 
-    using token
 
-    t := make_tokenizer(buf);
+    t := tok.make_tokenizer(buf)
 
-    for tok := next_token(&t); tok.type != TokenType.EOF; tok = next_token(&t) {
-        fmt.println(tok)
+    token_list := tok.tokenize(&t)
+
+    fmt.println("Tokens")
+    for token in token_list {
+        fmt.println(token)
     }
+
+    p := par.make_parser(t, token_list)
+
+    node_list := par.parse(&p)
+
+    fmt.println("Ast")
+    for node in node_list {
+        fmt.println(node)
+    }
+
+    fmt.println("Ast list")
+    fmt.println(node_list)
+
+    g := tacky.make_generator()
+    tacky_list := tacky.generate(&g)
+
+    fmt.println("Tacky")
+    fmt.println(tacky_list)
 }
