@@ -214,12 +214,13 @@ next_token :: proc(t: ^Tokenizer) -> Token {
 	return make_token(t, TokenKind.ERROR)
 }
 
-tokenize :: proc(t: ^Tokenizer) -> #soa[dynamic]Token {
-	list: #soa[dynamic]Token
+tokenize :: proc(t: ^Tokenizer) -> [dynamic]Token {
+	list: [dynamic]Token
 
 	for tok := next_token(t); tok.kind != TokenKind.EOF; tok = next_token(t) {
-		append_soa(&list, tok)
+		append(&list, tok)
 	}
 
 	return list
 }
+

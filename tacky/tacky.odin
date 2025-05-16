@@ -6,64 +6,64 @@ import "../parser"
 import "core:fmt"
 import "core:strconv"
 
-Constant :: struct {
-	value: int,
+Var :: struct {
+	id: int,
 }
 
-Var :: struct {
-	ident: string,
+Integer :: struct {
+	value: int,
 }
 
 Val :: union {
 	Var,
-	Constant,
+	Integer,
 }
 
 ProgOp :: struct {
-	func: [dynamic]Tac,
+	func: []Tac,
 }
 
 FuncOp :: struct {
 	ident: string,
-	body:  [dynamic]Tac,
-}
-
-AddOp :: struct {
-	result: int,
-	arg1:   int,
-	arg2:   int,
-}
-
-SubOp :: struct {
-	result: int,
-	arg1:   int,
-	arg2:   int,
-}
-
-MulOp :: struct {
-	result: int,
-	arg1:   int,
-	arg2:   int,
-}
-
-DivOp :: struct {
-	result: int,
-	arg1:   int,
-	arg2:   int,
+	body:  []Tac,
 }
 
 BitCompOp :: struct {
-	result: int,
-	arg:    int,
+	result: Val,
+	arg:    Val,
+}
+
+NegOp :: struct {
+	result: Val,
+	arg:    Val,
+}
+
+AddOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+SubOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+MulOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+DivOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
 }
 
 ReturnOp :: struct {
-	result: int,
-}
-
-IntOp :: struct {
-	result: int,
-	arg:    int,
+	arg: Val,
 }
 
 Tac :: union {
@@ -73,23 +73,26 @@ Tac :: union {
 	SubOp,
 	MulOp,
 	DivOp,
+	NegOp,
 	BitCompOp,
 	ReturnOp,
-	IntOp,
 }
 
 Generator :: struct {
-	ast_list:   [dynamic]parser.Node,
-	token_list: #soa[dynamic]lexer.Token,
+	ast_list:   [dynamic]parser.Ast,
+	token_list: [dynamic]lexer.Token,
 	tokenizer:  lexer.Tokenizer,
+	tmp_count:  int,
+	val_list:   [dynamic]Val,
 }
 
 make_generator :: proc(
-	ast_list: [dynamic]parser.Node,
-	token_list: #soa[dynamic]lexer.Token,
+	ast_list: [dynamic]parser.Ast,
+	token_list: [dynamic]lexer.Token,
 	tokenizer: lexer.Tokenizer,
 ) -> Generator {
-	return Generator{ast_list, token_list, tokenizer}
+	val_list := make([dynamic]Val, 8)
+	return Generator{ast_list, token_list, tokenizer, 0, val_list}
 }
 
 generate :: proc(g: ^Generator) -> []Tac {
@@ -97,45 +100,105 @@ generate :: proc(g: ^Generator) -> []Tac {
 
 	output := make([dynamic]Tac)
 
-	tmp := 0
-
 	for node in g.ast_list {
 		switch v in node {
 		case AstProgDef:
 		case AstFuncDef:
 			token := g.token_list[v.ident]
-			str := g.tokenizer.buf[token.start:token.end]
-			body := output
+			str := cast(string)g.tokenizer.buf[token.start:token.end]
+			body := output[:]
 			output = make([dynamic]Tac)
-			append(&output, FuncOp{ident = cast(string)str, body = body})
+
+			append(&output, FuncOp{ident = str, body = body})
 		case AstReturnStmt:
-			append(&output, ReturnOp{result = tmp - 1})
-			tmp += 1
+			arg := pop(&g.val_list)
+
+			append(&output, ReturnOp{arg})
 		case AstParenExpr:
 		case AstBitCompExpr:
-			append(&output, BitCompOp{result = tmp, arg = tmp - 1})
-			tmp += 1
+			result := Var{make_tmp(g)}
+			arg := pop(&g.val_list)
+
+			append(&output, BitCompOp{result, arg})
+			append(&g.val_list, result)
+		case AstNegExpr:
+			result := Var{make_tmp(g)}
+			arg := pop(&g.val_list)
+
+			append(&output, NegOp{result, arg})
+			append(&g.val_list, result)
 		case AstMulExpr:
-			append(&output, MulOp{result = tmp, arg1 = tmp - 1, arg2 = tmp - 2})
-			tmp += 1
+			result := Var{make_tmp(g)}
+			arg1 := pop(&g.val_list)
+			arg2 := pop(&g.val_list)
+
+			append(&output, MulOp{result, arg1, arg2})
+			append(&g.val_list, result)
 		case AstDivExpr:
-			append(&output, DivOp{result = tmp, arg1 = tmp - 1, arg2 = tmp - 2})
-			tmp += 1
+			result := Var{make_tmp(g)}
+			arg1 := pop(&g.val_list)
+			arg2 := pop(&g.val_list)
+
+			append(&output, DivOp{result, arg1, arg2})
+			append(&g.val_list, result)
 		case AstAddExpr:
-			append(&output, AddOp{result = tmp, arg1 = tmp - 1, arg2 = tmp - 2})
-			tmp += 1
+			result := Var{make_tmp(g)}
+			arg1 := pop(&g.val_list)
+			arg2 := pop(&g.val_list)
+
+			append(&output, AddOp{result, arg1, arg2})
+			append(&g.val_list, result)
 		case AstSubExpr:
-			append(&output, SubOp{result = tmp, arg1 = tmp - 1, arg2 = tmp - 2})
-			tmp += 1
+			result := Var{make_tmp(g)}
+			arg1 := pop(&g.val_list)
+			arg2 := pop(&g.val_list)
+
+			append(&output, SubOp{result, arg1, arg2})
+			append(&g.val_list, result)
 		case AstIntLiteral:
 			token := g.token_list[v.value]
-			str := g.tokenizer.buf[token.start:token.end]
-			value := strconv.atoi(cast(string)str)
+			str := cast(string)g.tokenizer.buf[token.start:token.end]
+			value := strconv.atoi(str)
 
-			append(&output, IntOp{result = tmp, arg = value})
-			tmp += 1
+			append(&g.val_list, Integer{value})
 		}
 	}
 
 	return output[:]
+}
+
+make_tmp :: proc(g: ^Generator) -> int {
+	tmp := g.tmp_count
+	g.tmp_count += 1
+	return tmp
+}
+
+print_tacky_list :: proc(list: []Tac) {
+	for node in list {
+        #partial switch v in node {
+		case ProgOp:
+		case FuncOp:
+			fmt.printfln("%s:", v.ident)
+			for op in v.body {
+				fmt.printf("  ")
+				switch o in op {
+				case NegOp:
+					fmt.printfln("%v = -%v", o.result, o.arg)
+				case BitCompOp:
+					fmt.printfln("%v = ~%v", o.result, o.arg)
+				case AddOp:
+					fmt.printfln("%v = %v + %v", o.result, o.arg1, o.arg2)
+				case SubOp:
+					fmt.printfln("%v = %v - %v", o.result, o.arg1, o.arg2)
+				case MulOp:
+					fmt.printfln("%v = %v * %v", o.result, o.arg1, o.arg2)
+				case DivOp:
+					fmt.printfln("%v = %v / %v", o.result, o.arg1, o.arg2)
+				case ReturnOp:
+					fmt.printfln("return %v", o.arg)
+                case ProgOp, FuncOp:
+				}
+			}
+		}
+	}
 }
