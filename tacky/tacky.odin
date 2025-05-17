@@ -20,12 +20,12 @@ Val :: union {
 }
 
 ProgOp :: struct {
-	func: []Tac,
+	func: [dynamic]Tac,
 }
 
 FuncOp :: struct {
 	ident: string,
-	body:  []Tac,
+	body:  [dynamic]Tac,
 }
 
 BitCompOp :: struct {
@@ -95,7 +95,7 @@ make_generator :: proc(
 	return Generator{ast_list, token_list, tokenizer, 0, val_list}
 }
 
-generate :: proc(g: ^Generator) -> []Tac {
+generate :: proc(g: ^Generator) -> [dynamic]Tac {
 	using parser
 
 	output := make([dynamic]Tac)
@@ -103,10 +103,14 @@ generate :: proc(g: ^Generator) -> []Tac {
 	for node in g.ast_list {
 		switch v in node {
 		case AstProgDef:
+			func := output
+			output = make([dynamic]Tac)
+
+			append(&output, ProgOp{func})
 		case AstFuncDef:
 			token := g.token_list[v.ident]
 			str := cast(string)g.tokenizer.buf[token.start:token.end]
-			body := output[:]
+			body := output
 			output = make([dynamic]Tac)
 
 			append(&output, FuncOp{ident = str, body = body})
@@ -164,7 +168,7 @@ generate :: proc(g: ^Generator) -> []Tac {
 		}
 	}
 
-	return output[:]
+	return output
 }
 
 make_tmp :: proc(g: ^Generator) -> int {
@@ -173,32 +177,32 @@ make_tmp :: proc(g: ^Generator) -> int {
 	return tmp
 }
 
-print_tacky_list :: proc(list: []Tac) {
+print_tacky_list :: proc(list: [dynamic]Tac, indent := 0) {
 	for node in list {
-        #partial switch v in node {
+		for i in 0 ..< indent {
+			fmt.print(' ')
+		}
+
+		switch o in node {
 		case ProgOp:
+			print_tacky_list(o.func, indent)
 		case FuncOp:
-			fmt.printfln("%s:", v.ident)
-			for op in v.body {
-				fmt.printf("  ")
-				switch o in op {
-				case NegOp:
-					fmt.printfln("%v = -%v", o.result, o.arg)
-				case BitCompOp:
-					fmt.printfln("%v = ~%v", o.result, o.arg)
-				case AddOp:
-					fmt.printfln("%v = %v + %v", o.result, o.arg1, o.arg2)
-				case SubOp:
-					fmt.printfln("%v = %v - %v", o.result, o.arg1, o.arg2)
-				case MulOp:
-					fmt.printfln("%v = %v * %v", o.result, o.arg1, o.arg2)
-				case DivOp:
-					fmt.printfln("%v = %v / %v", o.result, o.arg1, o.arg2)
-				case ReturnOp:
-					fmt.printfln("return %v", o.arg)
-                case ProgOp, FuncOp:
-				}
-			}
+			fmt.printfln("%v:", o.ident)
+			print_tacky_list(o.body, indent + 4)
+		case NegOp:
+			fmt.printfln("%v = -%v", o.result, o.arg)
+		case BitCompOp:
+			fmt.printfln("%v = ~%v", o.result, o.arg)
+		case AddOp:
+			fmt.printfln("%v = %v + %v", o.result, o.arg1, o.arg2)
+		case SubOp:
+			fmt.printfln("%v = %v - %v", o.result, o.arg1, o.arg2)
+		case MulOp:
+			fmt.printfln("%v = %v * %v", o.result, o.arg1, o.arg2)
+		case DivOp:
+			fmt.printfln("%v = %v / %v", o.result, o.arg1, o.arg2)
+		case ReturnOp:
+			fmt.printfln("return %v", o.arg)
 		}
 	}
 }

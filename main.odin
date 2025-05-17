@@ -1,9 +1,10 @@
 package main
 
-import "asmGen"
 import "lexer"
 import "parser"
 import "tacky"
+import "asmGen"
+import "emit"
 
 import "core:fmt"
 import "core:os"
@@ -43,22 +44,30 @@ main :: proc() {
 	g := tacky.make_generator(ast_list, token_list, t)
 	tacky_list := tacky.generate(&g)
 
-	tacky.print_tacky_list(tacky_list[:])
+	tacky.print_tacky_list(tacky_list)
 	fmt.println()
 
-	a := asmGen.make_generator()
+	a := asmGen.make_generator(&g)
 	asm_list := asmGen.generate(&a, tacky_list)
 
-	asmGen.print_asm_list(asm_list[:])
+	asmGen.print_asm_list(asm_list)
 	fmt.println()
 
 	asmGen.replace_pseudos(&a, asm_list)
 
-	asmGen.print_asm_list(asm_list[:])
+	asmGen.print_asm_list(asm_list)
 	fmt.println()
 
 	asmGen.find_min_offset_and_allocate(&a, asm_list)
 
-	asmGen.print_asm_list(asm_list[:])
+	asmGen.print_asm_list(asm_list)
 	fmt.println()
+
+    asmGen.replace_dual_stack_mov(&asm_list)
+
+	asmGen.print_asm_list(asm_list)
+	fmt.println()
+
+    e := emit.make_emitter()
+    emit.emit(&e, asm_list)
 }

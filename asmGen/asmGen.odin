@@ -5,6 +5,7 @@ import "../tacky"
 import "core:fmt"
 
 RegName :: enum {
+	R10,
 	RAX,
 }
 
@@ -73,8 +74,8 @@ Div :: struct {
 }
 
 Mov :: struct {
-	src: Val,
 	dst: Val,
+	src: Val,
 }
 
 Return :: struct {
@@ -99,29 +100,40 @@ Asm :: union {
 }
 
 Generator :: struct {
+	tmp_count: int,
 }
 
-make_generator :: proc() -> Generator {
-	return Generator{}
+make_generator :: proc(g: ^tacky.Generator) -> Generator {
+	return Generator{g.tmp_count}
 }
 
-generate :: proc(g: ^Generator, tacky_list: []tacky.Tac) -> [dynamic]Asm {
+make_tmp :: proc(g: ^Generator) -> int {
+	tmp := g.tmp_count
+	g.tmp_count += 1
+	return tmp
+}
+
+generate :: proc(g: ^Generator, tacky_list: [dynamic]tacky.Tac) -> [dynamic]Asm {
 	output := make([dynamic]Asm)
 
 	for node in tacky_list {
 		switch v in node {
 		case tacky.ProgOp:
-		// todo
+			append(&output, Prog{generate(g, v.func)})
 		case tacky.FuncOp:
 			append(&output, Func{v.ident, generate(g, v.body)})
 		case tacky.NegOp:
 			arg := convert_val(v.arg)
+			result := convert_val(v.result)
 
-			append(&output, Neg{arg})
+			append(&output, Mov{result, arg})
+			append(&output, Neg{result})
 		case tacky.BitCompOp:
 			arg := convert_val(v.arg)
+			result := convert_val(v.result)
 
-			append(&output, BitComp{arg})
+			append(&output, Mov{result, arg})
+			append(&output, Neg{result})
 		case tacky.AddOp:
 			result := convert_val(v.result)
 			arg1 := convert_val(v.arg1)
@@ -149,7 +161,7 @@ generate :: proc(g: ^Generator, tacky_list: []tacky.Tac) -> [dynamic]Asm {
 		case tacky.ReturnOp:
 			arg := convert_val(v.arg)
 
-			append(&output, Mov{arg, Reg{RegName.RAX}})
+			append(&output, Mov{Reg{RegName.RAX}, arg})
 			append(&output, Return{})
 		}
 	}
@@ -210,7 +222,7 @@ replace_pseudos :: proc(g: ^Generator, asm_list: [dynamic]Asm) {
 	}
 }
 
-find_min_offset_and_allocate :: proc(g: ^Generator, asm_list: [dynamic]Asm) {
+find_min_offset_and_allocate :: proc(g: ^Generator, list: [dynamic]Asm) {
 	// todo: naming :D
 	foo :: proc(a: int, b: Val) -> int {
 		if s, ok := b.(Stack); ok {
@@ -252,7 +264,7 @@ find_min_offset_and_allocate :: proc(g: ^Generator, asm_list: [dynamic]Asm) {
 		return min_offset
 	}
 
-	for &node in asm_list {
+	for &node in list {
 		switch &v in node {
 		case Prog:
 			find_min_offset_and_allocate(g, v.func)
@@ -269,7 +281,27 @@ find_min_offset_and_allocate :: proc(g: ^Generator, asm_list: [dynamic]Asm) {
 	}
 }
 
-print_asm_list :: proc(list: []Asm, indent := 0) {
+replace_dual_stack_mov :: proc(list: ^[dynamic]Asm) {
+	for &node, i in list {
+		#partial switch &v in node {
+		case Prog:
+			replace_dual_stack_mov(&v.func)
+		case Func:
+			replace_dual_stack_mov(&v.body)
+		case Mov:
+			_, dst_is_stack := v.src.(Stack)
+			_, src_is_stack := v.dst.(Stack)
+
+			if src_is_stack && dst_is_stack {
+				tmp := v.dst
+				v.dst = Reg{RegName.R10}
+				inject_at(list, i + 1, Mov{tmp, v.dst})
+			}
+		}
+	}
+}
+
+print_asm_list :: proc(list: [dynamic]Asm, indent := 0) {
 	for node, i in list {
 		for i in 0 ..< indent {
 			fmt.print(' ')
@@ -277,11 +309,10 @@ print_asm_list :: proc(list: []Asm, indent := 0) {
 
 		switch v in node {
 		case Prog:
-			fmt.println("Prog")
-			print_asm_list(v.func[:], indent + 4)
+			print_asm_list(v.func, indent)
 		case Func:
-			fmt.printfln("func: %s", v.ident)
-			print_asm_list(v.body[:], indent + 4)
+			fmt.printfln("%s:", v.ident)
+			print_asm_list(v.body, indent + 4)
 		case BitComp:
 			fmt.printfln("bitComp: %v", v.arg)
 		case Neg:
