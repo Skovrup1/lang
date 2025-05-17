@@ -5,8 +5,8 @@ import "../tacky"
 import "core:fmt"
 
 RegName :: enum {
-	R10,
-	RAX,
+	R10D,
+	EAX,
 }
 
 Reg :: struct {
@@ -133,7 +133,7 @@ generate :: proc(g: ^Generator, tacky_list: [dynamic]tacky.Tac) -> [dynamic]Asm 
 			result := convert_val(v.result)
 
 			append(&output, Mov{result, arg})
-			append(&output, Neg{result})
+			append(&output, BitComp{result})
 		case tacky.AddOp:
 			result := convert_val(v.result)
 			arg1 := convert_val(v.arg1)
@@ -161,7 +161,7 @@ generate :: proc(g: ^Generator, tacky_list: [dynamic]tacky.Tac) -> [dynamic]Asm 
 		case tacky.ReturnOp:
 			arg := convert_val(v.arg)
 
-			append(&output, Mov{Reg{RegName.RAX}, arg})
+			append(&output, Mov{Reg{RegName.EAX}, arg})
 			append(&output, Return{})
 		}
 	}
@@ -294,7 +294,7 @@ replace_dual_stack_mov :: proc(list: ^[dynamic]Asm) {
 
 			if src_is_stack && dst_is_stack {
 				tmp := v.dst
-				v.dst = Reg{RegName.R10}
+				v.dst = Reg{RegName.R10D}
 				inject_at(list, i + 1, Mov{tmp, v.dst})
 			}
 		}

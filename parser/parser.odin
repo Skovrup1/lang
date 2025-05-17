@@ -236,14 +236,14 @@ expect :: proc(p: ^Parser, expected: lexer.TokenKind) {
 	advance(p)
 }
 
-print_ast :: proc(ast_list: []Ast, indent: int = 0) {
+print_ast :: proc(ast_list: [dynamic]Ast, indent: int = 0) {
 	print_spaces :: proc(n: int) {
 		for i in 0 ..< n {
 			fmt.print(' ')
 		}
 	}
 
-	print_node :: proc(list: []Ast, index: AstIndex, indent: int) {
+	print_node :: proc(list: [dynamic]Ast, index: AstIndex, indent: int) {
 		if index < 0 || index >= len(list) {
 			print_spaces(indent)
 			fmt.println("<invalid ast index>")

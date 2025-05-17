@@ -1,15 +1,27 @@
 package main
 
+import "asmGen"
+import "emit"
 import "lexer"
 import "parser"
 import "tacky"
-import "asmGen"
-import "emit"
 
+import "core:flags"
 import "core:fmt"
 import "core:os"
 
 main :: proc() {
+	Options :: struct {
+        emit_only: bool,
+	}
+
+	opts: Options
+	err := flags.parse(&opts, os.args[1:])
+	if err != nil {
+		fmt.eprintf("failed to parse arguments: %v\n", err)
+		os.exit(1)
+	}
+
 	handle, open_err := os.open("tests/unary_expr.lang")
 	defer os.close(handle)
 
@@ -23,51 +35,65 @@ main :: proc() {
 	}
 	defer delete(buf)
 
-	fmt.println(cast(string)buf)
+	if !opts.emit_only {
+		fmt.println(cast(string)buf)
+	}
 
 	t := lexer.make_tokenizer(buf)
-
 	token_list := lexer.tokenize(&t)
 
-	for token in token_list {
-		fmt.println(token)
+	if !opts.emit_only {
+		for token in token_list {
+			fmt.println(token)
+		}
+		fmt.println()
 	}
-	fmt.println()
 
 	p := parser.make_parser(t, token_list)
-
 	ast_list := parser.parse(&p)
 
-	parser.print_ast(ast_list[:])
-	fmt.println()
+	if !opts.emit_only {
+		parser.print_ast(ast_list)
+		fmt.println()
+	}
 
 	g := tacky.make_generator(ast_list, token_list, t)
 	tacky_list := tacky.generate(&g)
 
-	tacky.print_tacky_list(tacky_list)
-	fmt.println()
+	if !opts.emit_only {
+		tacky.print_tacky_list(tacky_list)
+		fmt.println()
+	}
 
 	a := asmGen.make_generator(&g)
 	asm_list := asmGen.generate(&a, tacky_list)
 
-	asmGen.print_asm_list(asm_list)
-	fmt.println()
+	if !opts.emit_only {
+		asmGen.print_asm_list(asm_list)
+		fmt.println()
+	}
 
 	asmGen.replace_pseudos(&a, asm_list)
 
-	asmGen.print_asm_list(asm_list)
-	fmt.println()
+	if !opts.emit_only {
+		asmGen.print_asm_list(asm_list)
+		fmt.println()
+	}
 
 	asmGen.find_min_offset_and_allocate(&a, asm_list)
 
-	asmGen.print_asm_list(asm_list)
-	fmt.println()
+	if !opts.emit_only {
+		asmGen.print_asm_list(asm_list)
+		fmt.println()
+	}
 
-    asmGen.replace_dual_stack_mov(&asm_list)
+	asmGen.replace_dual_stack_mov(&asm_list)
 
-	asmGen.print_asm_list(asm_list)
-	fmt.println()
+	if !opts.emit_only {
+		asmGen.print_asm_list(asm_list)
+		fmt.println()
+	}
 
-    e := emit.make_emitter()
-    emit.emit(&e, asm_list)
+	e := emit.make_emitter()
+	emit.emit(&e, asm_list)
 }
