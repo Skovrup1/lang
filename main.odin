@@ -22,7 +22,7 @@ main :: proc() {
 		os.exit(1)
 	}
 
-	handle, open_err := os.open("tests/unary_expr.lang")
+	handle, open_err := os.open("tests/binary_expr.lang")
 	defer os.close(handle)
 
 	if open_err != os.ERROR_NONE {
@@ -87,7 +87,7 @@ main :: proc() {
 		fmt.println()
 	}
 
-	asmGen.replace_dual_stack_mov(&asm_list)
+	asmGen.replace_memory_op(&asm_list)
 
 	if !opts.emit_only {
 		asmGen.print_asm_list(asm_list)

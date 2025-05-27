@@ -30,6 +30,9 @@ TokenKind :: enum {
 	TRUE,
 	FALSE,
 	// symbols
+	DQUOTE, // "
+	HASH, // #
+	DOLLAR, // $
 	COMMA, // ,
 	PERIOD, // .
 	COLON, // :
@@ -43,12 +46,18 @@ TokenKind :: enum {
 	LESS, // <
 	GREATER, // >
 	EQUAL, // =
-
 	TILDE, // ~
 	PLUS, // +
 	MINUS, // -
 	ASTERISK, // *
 	SLASH, // /
+	PERCENT, // %
+	EXCLAIM, // !
+	AMPERSAND, // &
+	PIPE, // |
+	HAT, // ^
+	LSHIFT, // <<
+	RSHIFT, // >>
 
 	// keywords
 	RETURN = 64,
@@ -113,6 +122,8 @@ skip_whitespace :: proc(t: ^Tokenizer) {
 				for peek(t) != '\n' && !is_at_end(t) {
 					advance(t)
 				}
+			} else {
+				return
 			}
 		case:
 			return
@@ -177,38 +188,66 @@ next_token :: proc(t: ^Tokenizer) -> Token {
 	}
 
 	switch r {
+	case '!':
+		return make_token(t, TokenKind.EXCLAIM)
+	case '"':
+		return make_token(t, TokenKind.DQUOTE)
+	case '#':
+		return make_token(t, TokenKind.HASH)
+	case '$':
+		return make_token(t, TokenKind.DOLLAR)
+	case '%':
+		return make_token(t, TokenKind.PERCENT)
+	case '&':
+		return make_token(t, TokenKind.AMPERSAND)
 	case '(':
 		return make_token(t, TokenKind.LPAREN)
 	case ')':
 		return make_token(t, TokenKind.RPAREN)
-	case '{':
-		return make_token(t, TokenKind.LBRACE)
-	case '}':
-		return make_token(t, TokenKind.RBRACE)
-	case '[':
-		return make_token(t, TokenKind.LBRACKET)
-	case ']':
-		return make_token(t, TokenKind.RBRACKET)
+	case '*':
+		return make_token(t, TokenKind.ASTERISK)
+	case '+':
+		return make_token(t, TokenKind.PLUS)
+	case ',':
+		return make_token(t, TokenKind.PLUS)
+	case '-':
+		return make_token(t, TokenKind.MINUS)
+	case '.':
+		return make_token(t, TokenKind.PERIOD)
+	case '/':
+		return make_token(t, TokenKind.SLASH)
 	case ':':
 		return make_token(t, TokenKind.COLON)
 	case ';':
 		return make_token(t, TokenKind.SEMICOLON)
-	case '~':
-		return make_token(t, TokenKind.TILDE)
-	case '<':
-		return make_token(t, TokenKind.LESS)
-	case '>':
-		return make_token(t, TokenKind.GREATER)
 	case '=':
 		return make_token(t, TokenKind.EQUAL)
-	case '+':
-		return make_token(t, TokenKind.PLUS)
-    case '-':
-		return make_token(t, TokenKind.MINUS)
-	case '*':
-		return make_token(t, TokenKind.ASTERISK)
-	case '/':
-		return make_token(t, TokenKind.SLASH)
+	case '<':
+		if peek(t) == '<' {
+			advance(t)
+			return make_token(t, TokenKind.LSHIFT)
+		}
+		return make_token(t, TokenKind.LESS)
+	case '>':
+		if peek(t) == '>' {
+            advance(t)
+			return make_token(t, TokenKind.RSHIFT)
+		}
+		return make_token(t, TokenKind.GREATER)
+	case '[':
+		return make_token(t, TokenKind.LBRACKET)
+	case ']':
+		return make_token(t, TokenKind.RBRACKET)
+	case '^':
+		return make_token(t, TokenKind.HAT)
+	case '{':
+		return make_token(t, TokenKind.LBRACE)
+	case '}':
+		return make_token(t, TokenKind.RBRACE)
+	case '~':
+		return make_token(t, TokenKind.TILDE)
+	case '|':
+		return make_token(t, TokenKind.PIPE)
 	}
 
 	return make_token(t, TokenKind.ERROR)
@@ -223,4 +262,3 @@ tokenize :: proc(t: ^Tokenizer) -> [dynamic]Token {
 
 	return list
 }
-

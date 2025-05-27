@@ -24,49 +24,103 @@ emit :: proc(e: ^Emitter, list: [dynamic]asmGen.Asm, indent := 0) {
 
 		switch v in node {
 		case asmGen.Prog:
-			fmt.printfln("section .note.GNU-stack,\"\",@progbits")
+			fmt.println("section .note.GNU-stack,\"\",@progbits")
+			fmt.println("    global _start\n")
+			fmt.println("section .text\n")
+			fmt.println("_start:")
+			fmt.println("    call main")
+			fmt.println("    mov  edi, eax")
+			fmt.println("    mov  eax, 60")
+			fmt.println("    syscall\n")
 			emit(e, v.func, indent)
 		case asmGen.Func:
 			fmt.printfln("    global %v", v.ident)
 			fmt.printfln("%v:", v.ident)
-			fmt.printfln("    push rbp")
-			fmt.printfln("    mov  rbp, rsp")
+			fmt.println("    push rbp")
+			fmt.println("    mov  rbp, rsp")
 
 			emit(e, v.body, indent + 4)
 		case asmGen.Add:
-			panic("todo!")
-		case asmGen.Sub:
-			panic("todo!")
-		case asmGen.Mul:
-			panic("todo!")
-		case asmGen.Div:
-			panic("todo!")
-		case asmGen.BitComp:
+			result := convert_to_str(v.result)
 			arg := convert_to_str(v.arg)
 
-			#partial switch _ in v.arg {
-			case asmGen.Stack:
-				fmt.printfln("not  DWORD %v", arg)
-			case:
-				fmt.printfln("not %v", arg)
+			_, result_is_stack := v.result.(asmGen.Stack)
+			_, arg_is_integer := v.arg.(asmGen.Integer)
+			if result_is_stack && arg_is_integer {
+				fmt.printfln("add  DWORD %v, %v", result, arg)
+			} else {
+				fmt.printfln("add  %v, %v", result, arg)
 			}
+		case asmGen.Sub:
+			result := convert_to_str(v.result)
+			arg := convert_to_str(v.arg)
+
+			_, result_is_stack := v.result.(asmGen.Stack)
+			_, arg_is_integer := v.arg.(asmGen.Integer)
+			if result_is_stack && arg_is_integer {
+				fmt.printfln("sub  DWORD %v, %v", result, arg)
+			} else {
+				fmt.printfln("sub  %v, %v", result, arg)
+			}
+		case asmGen.Mul:
+			result := convert_to_str(v.result)
+			arg := convert_to_str(v.arg)
+
+			fmt.printfln("imul %v, %v", result, arg)
+		case asmGen.Div:
+			arg := convert_to_str(v.arg)
+
+			fmt.println("cdq")
+			print_spaces(indent)
+			_, arg_is_stack := v.arg.(asmGen.Stack)
+			if arg_is_stack {
+				fmt.printfln("idiv DWORD %v", arg)
+			} else {
+				fmt.printfln("idiv %v", arg)
+			}
+		case asmGen.BitAnd:
+			result := convert_to_str(v.result)
+			arg := convert_to_str(v.arg)
+
+			fmt.printfln("and  %v, %v", result, arg)
+		case asmGen.BitOr:
+			result := convert_to_str(v.result)
+			arg := convert_to_str(v.arg)
+
+			fmt.printfln("or   %v, %v", result, arg)
+		case asmGen.BitXor:
+			result := convert_to_str(v.result)
+			arg := convert_to_str(v.arg)
+
+			fmt.printfln("xor  %v, %v", result, arg)
+		case asmGen.LShift:
+			result := convert_to_str(v.result)
+			arg := convert_to_str(v.arg)
+
+			fmt.printfln("sal  %v, %v", result, arg)
+		case asmGen.RShift:
+			result := convert_to_str(v.result)
+			arg := convert_to_str(v.arg)
+
+			fmt.printfln("sar  %v, %v", result, arg)
+		case asmGen.Not:
+			arg := convert_to_str(v.arg)
+
+			fmt.printfln("not %v", arg)
 		case asmGen.Neg:
 			arg := convert_to_str(v.arg)
 
-			#partial switch _ in v.arg {
-			case asmGen.Stack:
-				fmt.printfln("neg  DWORD %v", arg)
-			case:
-				fmt.printfln("neg %v", arg)
-			}
+			fmt.printfln("neg %v", arg)
 		case asmGen.Mov:
 			dst := convert_to_str(v.dst)
 			src := convert_to_str(v.src)
 
-			#partial switch _ in v.dst {
-            case asmGen.Stack:
+			_, src_is_integer := v.src.(asmGen.Integer)
+			_, dst_is_stack := v.dst.(asmGen.Stack)
+
+			if src_is_integer && dst_is_stack {
 				fmt.printfln("mov  DWORD %v, %v", dst, src)
-			case:
+			} else {
 				fmt.printfln("mov  %v, %v", dst, src)
 			}
 		case asmGen.Return:

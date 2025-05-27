@@ -5,26 +5,6 @@ import "core:strconv"
 
 import "../lexer"
 
-Ast :: union {
-	// definitions
-	AstProgDef,
-	AstFuncDef,
-	// statements
-	AstReturnStmt,
-	// expressions
-	// unary
-	AstParenExpr,
-	AstBitCompExpr,
-	AstNegExpr,
-	// binary
-	AstMulExpr,
-	AstDivExpr,
-	AstAddExpr,
-	AstSubExpr,
-	// literals
-	AstIntLiteral,
-}
-
 AstIndex :: int
 TokenIndex :: int
 
@@ -45,12 +25,27 @@ AstNegExpr :: struct {
 	node: AstIndex,
 }
 
-AstBitCompExpr :: struct {
+AstBitNotExpr :: struct {
 	node: AstIndex,
 }
 
 AstParenExpr :: struct {
 	node: AstIndex,
+}
+
+AstBitAndExpr :: struct {
+	left:  AstIndex,
+	right: AstIndex,
+}
+
+AstBitOrExpr :: struct {
+	left:  AstIndex,
+	right: AstIndex,
+}
+
+AstBitXorExpr :: struct {
+	left:  AstIndex,
+	right: AstIndex,
 }
 
 AstMulExpr :: struct {
@@ -59,6 +54,11 @@ AstMulExpr :: struct {
 }
 
 AstDivExpr :: struct {
+	left:  AstIndex,
+	right: AstIndex,
+}
+
+AstModExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
@@ -73,8 +73,44 @@ AstSubExpr :: struct {
 	right: AstIndex,
 }
 
+AstLShiftExpr :: struct {
+	left:  AstIndex,
+	right: AstIndex,
+}
+
+AstRShiftExpr :: struct {
+	left:  AstIndex,
+	right: AstIndex,
+}
+
 AstIntLiteral :: struct {
 	value: TokenIndex,
+}
+
+Ast :: union {
+	// definitions
+	AstProgDef,
+	AstFuncDef,
+	// statements
+	AstReturnStmt,
+	// expressions
+	// unary
+	AstParenExpr,
+	AstBitNotExpr,
+	AstNegExpr,
+	// binary
+	AstBitAndExpr,
+	AstBitOrExpr,
+	AstBitXorExpr,
+	AstMulExpr,
+	AstDivExpr,
+	AstModExpr,
+	AstAddExpr,
+	AstSubExpr,
+	AstLShiftExpr,
+	AstRShiftExpr,
+	// literals
+	AstIntLiteral,
 }
 
 Parser :: struct {
@@ -168,7 +204,14 @@ parse_term :: proc(p: ^Parser) -> AstIndex {
 parse_factor :: proc(p: ^Parser) -> AstIndex {
 	left := parse_primary(p)
 
-	for peek(p) == .ASTERISK || peek(p) == .SLASH {
+	for peek(p) == .ASTERISK ||
+	    peek(p) == .SLASH ||
+	    peek(p) == .PERCENT ||
+	    peek(p) == .LSHIFT ||
+	    peek(p) == .RSHIFT ||
+	    peek(p) == .AMPERSAND ||
+	    peek(p) == .PIPE ||
+	    peek(p) == .HAT {
 		op := peek(p)
 		advance(p)
 
@@ -178,6 +221,18 @@ parse_factor :: proc(p: ^Parser) -> AstIndex {
 			append(&p.list, AstMulExpr{left = left, right = right})
 		case .SLASH:
 			append(&p.list, AstDivExpr{left = left, right = right})
+		case .PERCENT:
+			append(&p.list, AstModExpr{left = left, right = right})
+		case .LSHIFT:
+			append(&p.list, AstLShiftExpr{left = left, right = right})
+		case .RSHIFT:
+			append(&p.list, AstRShiftExpr{left = left, right = right})
+		case .AMPERSAND:
+			append(&p.list, AstBitAndExpr{left = left, right = right})
+		case .PIPE:
+			append(&p.list, AstBitOrExpr{left = left, right = right})
+		case .HAT:
+			append(&p.list, AstBitXorExpr{left = left, right = right})
 		}
 		left = len(p.list) - 1
 	}
@@ -187,6 +242,11 @@ parse_factor :: proc(p: ^Parser) -> AstIndex {
 
 parse_primary :: proc(p: ^Parser) -> AstIndex {
 	#partial switch peek(p) {
+	case .INTEGER:
+		advance(p)
+		append(&p.list, AstIntLiteral{value = p.previous})
+
+		return len(p.list) - 1
 	case .LPAREN:
 		advance(p)
 		expr := parse_expression(p)
@@ -194,15 +254,10 @@ parse_primary :: proc(p: ^Parser) -> AstIndex {
 		append(&p.list, AstParenExpr{node = expr})
 
 		return len(p.list) - 1
-	case .INTEGER:
-		advance(p)
-
-		append(&p.list, AstIntLiteral{value = p.previous})
-		return len(p.list) - 1
 	case .TILDE:
 		advance(p)
 		op := parse_primary(p)
-		append(&p.list, AstBitCompExpr{node = op})
+		append(&p.list, AstBitNotExpr{node = op})
 
 		return len(p.list) - 1
 	case .MINUS:
@@ -263,8 +318,8 @@ print_ast :: proc(ast_list: [dynamic]Ast, indent: int = 0) {
 		case AstReturnStmt:
 			fmt.println("AstReturnStmt")
 			print_node(list, v.node, indent + 2)
-		case AstBitCompExpr:
-			fmt.println("AstBitCompExpr")
+		case AstBitNotExpr:
+			fmt.println("AstBitNotExpr")
 			print_node(list, v.node, indent + 2)
 		case AstNegExpr:
 			fmt.println("AstNegExpr")
@@ -272,6 +327,18 @@ print_ast :: proc(ast_list: [dynamic]Ast, indent: int = 0) {
 		case AstParenExpr:
 			fmt.println("AstParenExpr")
 			print_node(list, v.node, indent + 2)
+		case AstBitAndExpr:
+			fmt.println("AstBitAndExpr")
+			print_node(list, v.left, indent + 2)
+			print_node(list, v.right, indent + 2)
+		case AstBitOrExpr:
+			fmt.println("AstBitOrExpr")
+			print_node(list, v.left, indent + 2)
+			print_node(list, v.right, indent + 2)
+		case AstBitXorExpr:
+			fmt.println("AstBitXorExpr")
+			print_node(list, v.left, indent + 2)
+			print_node(list, v.right, indent + 2)
 		case AstMulExpr:
 			fmt.println("AstMulExpr")
 			print_node(list, v.left, indent + 2)
@@ -280,12 +347,24 @@ print_ast :: proc(ast_list: [dynamic]Ast, indent: int = 0) {
 			fmt.println("AstDivExpr")
 			print_node(list, v.left, indent + 2)
 			print_node(list, v.right, indent + 2)
+		case AstModExpr:
+			fmt.println("AstModExpr")
+			print_node(list, v.left, indent + 2)
+			print_node(list, v.right, indent + 2)
 		case AstAddExpr:
 			fmt.println("AstAddExpr")
 			print_node(list, v.left, indent + 2)
 			print_node(list, v.right, indent + 2)
 		case AstSubExpr:
 			fmt.println("AstSubExpr")
+			print_node(list, v.left, indent + 2)
+			print_node(list, v.right, indent + 2)
+		case AstLShiftExpr:
+			fmt.println("AstLShiftExpr")
+			print_node(list, v.left, indent + 2)
+			print_node(list, v.right, indent + 2)
+		case AstRShiftExpr:
+			fmt.println("AstLShiftExpr")
 			print_node(list, v.left, indent + 2)
 			print_node(list, v.right, indent + 2)
 		case AstIntLiteral:

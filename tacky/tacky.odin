@@ -28,7 +28,25 @@ FuncOp :: struct {
 	body:  [dynamic]Tac,
 }
 
-BitCompOp :: struct {
+BitAndOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+BitOrOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+BitXorOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+NotOp :: struct {
 	result: Val,
 	arg:    Val,
 }
@@ -62,6 +80,24 @@ DivOp :: struct {
 	arg2:   Val,
 }
 
+ModOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+LShiftOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+RShiftOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
 ReturnOp :: struct {
 	arg: Val,
 }
@@ -73,8 +109,14 @@ Tac :: union {
 	SubOp,
 	MulOp,
 	DivOp,
+	ModOp,
+	BitAndOp,
+	BitOrOp,
+	BitXorOp,
 	NegOp,
-	BitCompOp,
+	LShiftOp,
+	RShiftOp,
+	NotOp,
 	ReturnOp,
 }
 
@@ -119,11 +161,11 @@ generate :: proc(g: ^Generator) -> [dynamic]Tac {
 
 			append(&output, ReturnOp{arg})
 		case AstParenExpr:
-		case AstBitCompExpr:
+		case AstBitNotExpr:
 			result := Var{make_tmp(g)}
 			arg := pop(&g.val_list)
 
-			append(&output, BitCompOp{result, arg})
+			append(&output, NotOp{result, arg})
 			append(&g.val_list, result)
 		case AstNegExpr:
 			result := Var{make_tmp(g)}
@@ -131,33 +173,75 @@ generate :: proc(g: ^Generator) -> [dynamic]Tac {
 
 			append(&output, NegOp{result, arg})
 			append(&g.val_list, result)
+		case AstBitAndExpr:
+			result := Var{make_tmp(g)}
+			arg2 := pop(&g.val_list)
+			arg1 := pop(&g.val_list)
+
+			append(&output, BitAndOp{result, arg1, arg2})
+			append(&g.val_list, result)
+		case AstBitOrExpr:
+			result := Var{make_tmp(g)}
+			arg2 := pop(&g.val_list)
+			arg1 := pop(&g.val_list)
+
+			append(&output, BitOrOp{result, arg1, arg2})
+			append(&g.val_list, result)
+		case AstBitXorExpr:
+			result := Var{make_tmp(g)}
+			arg2 := pop(&g.val_list)
+			arg1 := pop(&g.val_list)
+
+			append(&output, BitXorOp{result, arg1, arg2})
+			append(&g.val_list, result)
 		case AstMulExpr:
 			result := Var{make_tmp(g)}
-			arg1 := pop(&g.val_list)
 			arg2 := pop(&g.val_list)
+			arg1 := pop(&g.val_list)
 
 			append(&output, MulOp{result, arg1, arg2})
 			append(&g.val_list, result)
 		case AstDivExpr:
 			result := Var{make_tmp(g)}
-			arg1 := pop(&g.val_list)
 			arg2 := pop(&g.val_list)
+			arg1 := pop(&g.val_list)
 
 			append(&output, DivOp{result, arg1, arg2})
 			append(&g.val_list, result)
+		case AstModExpr:
+			result := Var{make_tmp(g)}
+			arg2 := pop(&g.val_list)
+			arg1 := pop(&g.val_list)
+
+			append(&output, ModOp{result, arg1, arg2})
+			append(&g.val_list, result)
 		case AstAddExpr:
 			result := Var{make_tmp(g)}
-			arg1 := pop(&g.val_list)
 			arg2 := pop(&g.val_list)
+			arg1 := pop(&g.val_list)
 
 			append(&output, AddOp{result, arg1, arg2})
 			append(&g.val_list, result)
 		case AstSubExpr:
 			result := Var{make_tmp(g)}
-			arg1 := pop(&g.val_list)
 			arg2 := pop(&g.val_list)
+			arg1 := pop(&g.val_list)
 
 			append(&output, SubOp{result, arg1, arg2})
+			append(&g.val_list, result)
+		case AstLShiftExpr:
+			result := Var{make_tmp(g)}
+			arg2 := pop(&g.val_list)
+			arg1 := pop(&g.val_list)
+
+			append(&output, LShiftOp{result, arg1, arg2})
+			append(&g.val_list, result)
+		case AstRShiftExpr:
+			result := Var{make_tmp(g)}
+			arg2 := pop(&g.val_list)
+			arg1 := pop(&g.val_list)
+
+			append(&output, RShiftOp{result, arg1, arg2})
 			append(&g.val_list, result)
 		case AstIntLiteral:
 			token := g.token_list[v.value]
@@ -191,8 +275,14 @@ print_tacky_list :: proc(list: [dynamic]Tac, indent := 0) {
 			print_tacky_list(o.body, indent + 4)
 		case NegOp:
 			fmt.printfln("%v = -%v", o.result, o.arg)
-		case BitCompOp:
+		case NotOp:
 			fmt.printfln("%v = ~%v", o.result, o.arg)
+		case BitAndOp:
+			fmt.printfln("%v = %v & %v", o.result, o.arg1, o.arg2)
+		case BitOrOp:
+			fmt.printfln("%v = %v | %v", o.result, o.arg1, o.arg2)
+		case BitXorOp:
+			fmt.printfln("%v = %v ^ %v", o.result, o.arg1, o.arg2)
 		case AddOp:
 			fmt.printfln("%v = %v + %v", o.result, o.arg1, o.arg2)
 		case SubOp:
@@ -201,6 +291,12 @@ print_tacky_list :: proc(list: [dynamic]Tac, indent := 0) {
 			fmt.printfln("%v = %v * %v", o.result, o.arg1, o.arg2)
 		case DivOp:
 			fmt.printfln("%v = %v / %v", o.result, o.arg1, o.arg2)
+		case ModOp:
+			fmt.printfln("%v = %v %% %v", o.result, o.arg1, o.arg2)
+		case LShiftOp:
+			fmt.printfln("%v = %v << %v", o.result, o.arg1, o.arg2)
+		case RShiftOp:
+			fmt.printfln("%v = %v >> %v", o.result, o.arg1, o.arg2)
 		case ReturnOp:
 			fmt.printfln("return %v", o.arg)
 		}

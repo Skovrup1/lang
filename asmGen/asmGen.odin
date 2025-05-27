@@ -6,7 +6,10 @@ import "core:fmt"
 
 RegName :: enum {
 	R10D,
+	R11D,
 	EAX,
+	EDX,
+	CL,
 }
 
 Reg :: struct {
@@ -41,7 +44,7 @@ Func :: struct {
 	body:  [dynamic]Asm,
 }
 
-BitComp :: struct {
+Not :: struct {
 	arg: Val,
 }
 
@@ -51,31 +54,51 @@ Neg :: struct {
 
 Add :: struct {
 	result: Val,
-	arg1:   Val,
-	arg2:   Val,
+	arg:    Val,
 }
 
 Sub :: struct {
 	result: Val,
-	arg1:   Val,
-	arg2:   Val,
+	arg:    Val,
 }
 
 Mul :: struct {
 	result: Val,
-	arg1:   Val,
-	arg2:   Val,
+	arg:    Val,
 }
 
 Div :: struct {
-	result: Val,
-	arg1:   Val,
-	arg2:   Val,
+	arg: Val,
 }
 
 Mov :: struct {
 	dst: Val,
 	src: Val,
+}
+
+BitOr :: struct {
+	result: Val,
+	arg:    Val,
+}
+
+BitAnd :: struct {
+	result: Val,
+	arg:    Val,
+}
+
+BitXor :: struct {
+	result: Val,
+	arg:    Val,
+}
+
+LShift :: struct {
+	result: Val,
+	arg:    Val,
+}
+
+RShift :: struct {
+	result: Val,
+	arg:    Val,
 }
 
 Return :: struct {
@@ -92,9 +115,14 @@ Asm :: union {
 	Sub,
 	Mul,
 	Div,
-	BitComp,
+	Not,
 	Neg,
 	Mov,
+	BitOr,
+	BitAnd,
+    BitXor,
+	LShift,
+	RShift,
 	Return,
 	AllocateStack,
 }
@@ -128,36 +156,90 @@ generate :: proc(g: ^Generator, tacky_list: [dynamic]tacky.Tac) -> [dynamic]Asm 
 
 			append(&output, Mov{result, arg})
 			append(&output, Neg{result})
-		case tacky.BitCompOp:
+		case tacky.NotOp:
 			arg := convert_val(v.arg)
 			result := convert_val(v.result)
 
 			append(&output, Mov{result, arg})
-			append(&output, BitComp{result})
+			append(&output, Not{result})
 		case tacky.AddOp:
 			result := convert_val(v.result)
 			arg1 := convert_val(v.arg1)
 			arg2 := convert_val(v.arg2)
 
-			append(&output, Add{result, arg1, arg2})
+			append(&output, Mov{result, arg1})
+			append(&output, Add{result, arg2})
 		case tacky.SubOp:
 			result := convert_val(v.result)
 			arg1 := convert_val(v.arg1)
 			arg2 := convert_val(v.arg2)
 
-			append(&output, Sub{result, arg1, arg2})
+			append(&output, Mov{result, arg1})
+			append(&output, Sub{result, arg2})
 		case tacky.MulOp:
 			result := convert_val(v.result)
 			arg1 := convert_val(v.arg1)
 			arg2 := convert_val(v.arg2)
 
-			append(&output, Mul{result, arg1, arg2})
+			append(&output, Mov{Reg{RegName.EAX}, arg1})
+			append(&output, Mul{Reg{RegName.EAX}, arg2})
+			append(&output, Mov{result, Reg{RegName.EAX}})
 		case tacky.DivOp:
 			result := convert_val(v.result)
 			arg1 := convert_val(v.arg1)
 			arg2 := convert_val(v.arg2)
 
-			append(&output, Div{result, arg1, arg2})
+			append(&output, Mov{Reg{RegName.EAX}, arg1})
+			append(&output, Div{arg2})
+			append(&output, Mov{result, Reg{RegName.EAX}})
+		case tacky.ModOp:
+			result := convert_val(v.result)
+			arg1 := convert_val(v.arg1)
+			arg2 := convert_val(v.arg2)
+
+			append(&output, Mov{Reg{RegName.EAX}, arg1})
+			append(&output, Div{arg2})
+			append(&output, Mov{result, Reg{RegName.EDX}})
+		case tacky.BitAndOp:
+			result := convert_val(v.result)
+			arg1 := convert_val(v.arg1)
+			arg2 := convert_val(v.arg2)
+
+			append(&output, Mov{Reg{RegName.EAX}, arg1})
+			append(&output, BitAnd{Reg{RegName.EAX}, arg2})
+			append(&output, Mov{result, Reg{RegName.EAX}})
+		case tacky.BitOrOp:
+			result := convert_val(v.result)
+			arg1 := convert_val(v.arg1)
+			arg2 := convert_val(v.arg2)
+
+			append(&output, Mov{Reg{RegName.EAX}, arg1})
+			append(&output, BitOr{Reg{RegName.EAX}, arg2})
+			append(&output, Mov{result, Reg{RegName.EAX}})
+		case tacky.BitXorOp:
+			result := convert_val(v.result)
+			arg1 := convert_val(v.arg1)
+			arg2 := convert_val(v.arg2)
+
+			append(&output, Mov{Reg{RegName.EAX}, arg1})
+			append(&output, BitXor{Reg{RegName.EAX}, arg2})
+			append(&output, Mov{result, Reg{RegName.EAX}})
+		case tacky.LShiftOp:
+			result := convert_val(v.result)
+			arg1 := convert_val(v.arg1)
+			arg2 := convert_val(v.arg2)
+
+			append(&output, Mov{Reg{RegName.EAX}, arg1})
+			append(&output, LShift{Reg{RegName.EAX}, arg2})
+			append(&output, Mov{result, Reg{RegName.EAX}})
+		case tacky.RShiftOp:
+			result := convert_val(v.result)
+			arg1 := convert_val(v.arg1)
+			arg2 := convert_val(v.arg2)
+
+			append(&output, Mov{Reg{RegName.EAX}, arg1})
+			append(&output, RShift{Reg{RegName.EAX}, arg2})
+			append(&output, Mov{result, Reg{RegName.EAX}})
 		case tacky.ReturnOp:
 			arg := convert_val(v.arg)
 
@@ -194,26 +276,36 @@ replace_pseudos :: proc(g: ^Generator, asm_list: [dynamic]Asm) {
 			replace_pseudos(g, v.func)
 		case Func:
 			replace_pseudos(g, v.body)
-		case BitComp:
+		case Not:
 			v.arg = replace_if(v.arg)
 		case Neg:
 			v.arg = replace_if(v.arg)
 		case Add:
 			v.result = replace_if(v.result)
-			v.arg1 = replace_if(v.arg1)
-			v.arg2 = replace_if(v.arg2)
+			v.arg = replace_if(v.arg)
 		case Sub:
 			v.result = replace_if(v.result)
-			v.arg1 = replace_if(v.arg1)
-			v.arg2 = replace_if(v.arg2)
+			v.arg = replace_if(v.arg)
 		case Mul:
 			v.result = replace_if(v.result)
-			v.arg1 = replace_if(v.arg1)
-			v.arg2 = replace_if(v.arg2)
+			v.arg = replace_if(v.arg)
 		case Div:
+			v.arg = replace_if(v.arg)
+		case BitAnd:
 			v.result = replace_if(v.result)
-			v.arg1 = replace_if(v.arg1)
-			v.arg2 = replace_if(v.arg2)
+			v.arg = replace_if(v.arg)
+		case BitOr:
+			v.result = replace_if(v.result)
+			v.arg = replace_if(v.arg)
+		case BitXor:
+			v.result = replace_if(v.result)
+			v.arg = replace_if(v.arg)
+		case LShift:
+			v.result = replace_if(v.result)
+			v.arg = replace_if(v.arg)
+		case RShift:
+			v.result = replace_if(v.result)
+			v.arg = replace_if(v.arg)
 		case Mov:
 			v.dst = replace_if(v.dst)
 			v.src = replace_if(v.src)
@@ -235,26 +327,36 @@ find_min_offset_and_allocate :: proc(g: ^Generator, list: [dynamic]Asm) {
 		min_offset := 0
 		for node in nodes {
 			switch v in node {
-			case BitComp:
+			case Not:
 				min_offset = foo(min_offset, v.arg)
 			case Neg:
 				min_offset = foo(min_offset, v.arg)
 			case Add:
 				min_offset = foo(min_offset, v.result)
-				min_offset = foo(min_offset, v.arg1)
-				min_offset = foo(min_offset, v.arg2)
+				min_offset = foo(min_offset, v.arg)
 			case Sub:
 				min_offset = foo(min_offset, v.result)
-				min_offset = foo(min_offset, v.arg1)
-				min_offset = foo(min_offset, v.arg2)
+				min_offset = foo(min_offset, v.arg)
 			case Mul:
 				min_offset = foo(min_offset, v.result)
-				min_offset = foo(min_offset, v.arg1)
-				min_offset = foo(min_offset, v.arg2)
+				min_offset = foo(min_offset, v.arg)
 			case Div:
+				min_offset = foo(min_offset, v.arg)
+			case BitAnd:
 				min_offset = foo(min_offset, v.result)
-				min_offset = foo(min_offset, v.arg1)
-				min_offset = foo(min_offset, v.arg2)
+				min_offset = foo(min_offset, v.arg)
+			case BitOr:
+				min_offset = foo(min_offset, v.result)
+				min_offset = foo(min_offset, v.arg)
+			case BitXor:
+				min_offset = foo(min_offset, v.result)
+				min_offset = foo(min_offset, v.arg)
+			case LShift:
+				min_offset = foo(min_offset, v.result)
+				min_offset = foo(min_offset, v.arg)
+			case RShift:
+				min_offset = foo(min_offset, v.result)
+				min_offset = foo(min_offset, v.arg)
 			case Mov:
 				min_offset = foo(min_offset, v.dst)
 				min_offset = foo(min_offset, v.src)
@@ -265,29 +367,29 @@ find_min_offset_and_allocate :: proc(g: ^Generator, list: [dynamic]Asm) {
 	}
 
 	for &node in list {
-		switch &v in node {
+		#partial switch &v in node {
 		case Prog:
 			find_min_offset_and_allocate(g, v.func)
 		case Func:
 			min_offset := find_min_offset(v.body)
 			if min_offset < 0 {
-				alloc_size := -min_offset
+				size := -min_offset
+				align := 16
+				aligned_size := (size + (align - 1)) & ~(align - 1)
 
-				inject_at(&v.body, 0, AllocateStack{size = alloc_size})
+				inject_at(&v.body, 0, AllocateStack{aligned_size})
 			}
-		case BitComp, Neg, Add, Sub, Mul, Div, Return, AllocateStack, Mov:
-		// no recursive processing needed
 		}
 	}
 }
 
-replace_dual_stack_mov :: proc(list: ^[dynamic]Asm) {
+replace_memory_op :: proc(list: ^[dynamic]Asm) {
 	for &node, i in list {
 		#partial switch &v in node {
 		case Prog:
-			replace_dual_stack_mov(&v.func)
+			replace_memory_op(&v.func)
 		case Func:
-			replace_dual_stack_mov(&v.body)
+			replace_memory_op(&v.body)
 		case Mov:
 			_, dst_is_stack := v.src.(Stack)
 			_, src_is_stack := v.dst.(Stack)
@@ -296,6 +398,39 @@ replace_dual_stack_mov :: proc(list: ^[dynamic]Asm) {
 				tmp := v.dst
 				v.dst = Reg{RegName.R10D}
 				inject_at(list, i + 1, Mov{tmp, v.dst})
+			}
+		case Add:
+			_, result_is_stack := v.result.(Stack)
+			_, arg_is_stack := v.arg.(Stack)
+
+			if arg_is_stack && result_is_stack {
+				tmp := v.result
+				v.result = Reg{RegName.R10D}
+				inject_at(list, i + 1, Mov{tmp, v.result})
+			}
+		case Div:
+			_, arg_is_integer := v.arg.(Integer)
+
+			if arg_is_integer {
+				tmp := v.arg
+				v.arg = Reg{RegName.R11D}
+				inject_at(list, i, Mov{v.arg, tmp})
+			}
+		case LShift:
+			_, arg_is_Stack := v.arg.(Stack)
+
+			if arg_is_Stack {
+				tmp := v.arg
+				v.arg = Reg{RegName.CL}
+				inject_at(list, i, Mov{v.arg, tmp})
+			}
+		case RShift:
+			_, arg_is_Stack := v.arg.(Stack)
+
+			if arg_is_Stack {
+				tmp := v.arg
+				v.arg = Reg{RegName.CL}
+				inject_at(list, i, Mov{v.arg, tmp})
 			}
 		}
 	}
@@ -313,18 +448,28 @@ print_asm_list :: proc(list: [dynamic]Asm, indent := 0) {
 		case Func:
 			fmt.printfln("%s:", v.ident)
 			print_asm_list(v.body, indent + 4)
-		case BitComp:
-			fmt.printfln("bitComp: %v", v.arg)
+		case Not:
+			fmt.printfln("not: %v", v.arg)
 		case Neg:
 			fmt.printfln("neg: %v", v.arg)
 		case Add:
-			fmt.printfln("add: %v, %v, %v", v.result, v.arg1, v.arg2)
+			fmt.printfln("add: %v, %v", v.result, v.arg)
 		case Sub:
-			fmt.printfln("sub: %v, %v, %v", v.result, v.arg1, v.arg2)
+			fmt.printfln("sub: %v, %v", v.result, v.arg)
 		case Mul:
-			fmt.printfln("mul: %v, %v, %v", v.result, v.arg1, v.arg2)
+			fmt.printfln("mul: %v, %v", v.result, v.arg)
 		case Div:
-			fmt.printfln("div: %v, %v, %v", v.result, v.arg1, v.arg2)
+			fmt.printfln("div: %v", v.arg)
+		case BitOr:
+			fmt.printfln("bitor: %v, %v", v.result, v.arg)
+		case BitAnd:
+			fmt.printfln("bitand: %v, %v", v.result, v.arg)
+		case BitXor:
+			fmt.printfln("bitxor: %v, %v", v.result, v.arg)
+		case LShift:
+			fmt.printfln("lshift: %v, %v", v.result, v.arg)
+		case RShift:
+			fmt.printfln("rshift: %v, %v", v.result, v.arg)
 		case Mov:
 			fmt.printfln("mov: %v, %v", v.dst, v.src)
 		case Return:
