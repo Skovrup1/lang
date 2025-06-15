@@ -12,7 +12,7 @@ import "core:os"
 
 main :: proc() {
 	Options :: struct {
-        emit_only: bool,
+		emit_only: bool,
 	}
 
 	opts: Options
@@ -51,6 +51,7 @@ main :: proc() {
 
 	p := parser.make_parser(t, token_list)
 	ast_list := parser.parse(&p)
+    fmt.println(ast_list)
 
 	if !opts.emit_only {
 		parser.print_ast(ast_list)

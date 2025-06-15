@@ -7,7 +7,9 @@ import "core:fmt"
 RegName :: enum {
 	R10D,
 	R11D,
+	RAX,
 	EAX,
+	AL,
 	EDX,
 	CL,
 }
@@ -76,6 +78,15 @@ Mov :: struct {
 	src: Val,
 }
 
+Movzx :: struct {
+	dst: Val,
+	src: Val,
+}
+
+BitNot :: struct {
+	arg: Val,
+}
+
 BitOr :: struct {
 	result: Val,
 	arg:    Val,
@@ -115,12 +126,14 @@ Asm :: union {
 	Sub,
 	Mul,
 	Div,
-	Not,
 	Neg,
+	Not,
+	Movzx,
 	Mov,
+	BitNot,
 	BitOr,
 	BitAnd,
-    BitXor,
+	BitXor,
 	LShift,
 	RShift,
 	Return,
@@ -145,7 +158,7 @@ generate :: proc(g: ^Generator, tacky_list: [dynamic]tacky.Tac) -> [dynamic]Asm 
 	output := make([dynamic]Asm)
 
 	for node in tacky_list {
-		switch v in node {
+        #partial switch v in node {
 		case tacky.ProgOp:
 			append(&output, Prog{generate(g, v.func)})
 		case tacky.FuncOp:
@@ -156,12 +169,12 @@ generate :: proc(g: ^Generator, tacky_list: [dynamic]tacky.Tac) -> [dynamic]Asm 
 
 			append(&output, Mov{result, arg})
 			append(&output, Neg{result})
-		case tacky.NotOp:
+		case tacky.BitNotOp:
 			arg := convert_val(v.arg)
 			result := convert_val(v.result)
 
 			append(&output, Mov{result, arg})
-			append(&output, Not{result})
+			append(&output, BitNot{result})
 		case tacky.AddOp:
 			result := convert_val(v.result)
 			arg1 := convert_val(v.arg1)
@@ -240,6 +253,30 @@ generate :: proc(g: ^Generator, tacky_list: [dynamic]tacky.Tac) -> [dynamic]Asm 
 			append(&output, Mov{Reg{RegName.EAX}, arg1})
 			append(&output, RShift{Reg{RegName.EAX}, arg2})
 			append(&output, Mov{result, Reg{RegName.EAX}})
+		case tacky.NotOp:
+			arg := convert_val(v.arg)
+			result := convert_val(v.result)
+
+			append(&output, Mov{result, arg})
+			append(&output, Not{result})
+			append(&output, Movzx{Reg{RegName.EAX}, Reg{RegName.AL}})
+			append(&output, Mov{result, Reg{RegName.EAX}})
+		case tacky.AndOp:
+			panic("todo!")
+		case tacky.OrOp:
+			panic("todo!")
+		case tacky.EqualOp:
+            panic("todo!")
+		case tacky.NotEqualOp:
+			panic("todo!")
+		case tacky.LessOp:
+			panic("todo!")
+		case tacky.LessEqualOp:
+			panic("todo!")
+		case tacky.GreaterOp:
+			panic("todo!")
+		case tacky.GreaterEqualOp:
+			panic("todo!")
 		case tacky.ReturnOp:
 			arg := convert_val(v.arg)
 
@@ -291,6 +328,8 @@ replace_pseudos :: proc(g: ^Generator, asm_list: [dynamic]Asm) {
 			v.arg = replace_if(v.arg)
 		case Div:
 			v.arg = replace_if(v.arg)
+		case BitNot:
+			v.arg = replace_if(v.arg)
 		case BitAnd:
 			v.result = replace_if(v.result)
 			v.arg = replace_if(v.arg)
@@ -307,6 +346,9 @@ replace_pseudos :: proc(g: ^Generator, asm_list: [dynamic]Asm) {
 			v.result = replace_if(v.result)
 			v.arg = replace_if(v.arg)
 		case Mov:
+			v.dst = replace_if(v.dst)
+			v.src = replace_if(v.src)
+		case Movzx:
 			v.dst = replace_if(v.dst)
 			v.src = replace_if(v.src)
 		case Return, AllocateStack:
@@ -326,7 +368,7 @@ find_min_offset_and_allocate :: proc(g: ^Generator, list: [dynamic]Asm) {
 	find_min_offset :: proc(nodes: [dynamic]Asm) -> int {
 		min_offset := 0
 		for node in nodes {
-			switch v in node {
+			#partial switch v in node {
 			case Not:
 				min_offset = foo(min_offset, v.arg)
 			case Neg:
@@ -341,6 +383,8 @@ find_min_offset_and_allocate :: proc(g: ^Generator, list: [dynamic]Asm) {
 				min_offset = foo(min_offset, v.result)
 				min_offset = foo(min_offset, v.arg)
 			case Div:
+				min_offset = foo(min_offset, v.arg)
+			case BitNot:
 				min_offset = foo(min_offset, v.arg)
 			case BitAnd:
 				min_offset = foo(min_offset, v.result)
@@ -360,7 +404,9 @@ find_min_offset_and_allocate :: proc(g: ^Generator, list: [dynamic]Asm) {
 			case Mov:
 				min_offset = foo(min_offset, v.dst)
 				min_offset = foo(min_offset, v.src)
-			case Prog, Func, Return, AllocateStack:
+			case Movzx:
+				min_offset = foo(min_offset, v.dst)
+				min_offset = foo(min_offset, v.src)
 			}
 		}
 		return min_offset
@@ -460,6 +506,8 @@ print_asm_list :: proc(list: [dynamic]Asm, indent := 0) {
 			fmt.printfln("mul: %v, %v", v.result, v.arg)
 		case Div:
 			fmt.printfln("div: %v", v.arg)
+		case BitNot:
+			fmt.printfln("bitnot: %v", v.arg)
 		case BitOr:
 			fmt.printfln("bitor: %v, %v", v.result, v.arg)
 		case BitAnd:
@@ -472,6 +520,8 @@ print_asm_list :: proc(list: [dynamic]Asm, indent := 0) {
 			fmt.printfln("rshift: %v, %v", v.result, v.arg)
 		case Mov:
 			fmt.printfln("mov: %v, %v", v.dst, v.src)
+		case Movzx:
+			fmt.printfln("movzx: %v, %v", v.dst, v.src)
 		case Return:
 			fmt.printfln("return:")
 		case AllocateStack:

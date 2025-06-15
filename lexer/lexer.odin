@@ -30,7 +30,6 @@ TokenKind :: enum {
 	TRUE,
 	FALSE,
 	// symbols
-	DQUOTE, // "
 	HASH, // #
 	DOLLAR, // $
 	COMMA, // ,
@@ -43,16 +42,22 @@ TokenKind :: enum {
 	RBRACKET, // ]
 	LBRACE, // {
 	RBRACE, // }
+	OR, // ||
+	AND, // &&
 	LESS, // <
+	LESS_EQUAL, // <=
 	GREATER, // >
-	EQUAL, // =
-	TILDE, // ~
+	GREATER_EQUAL, // >=
+	ASSIGN, // =
+	EQUAL, // ==
 	PLUS, // +
 	MINUS, // -
 	ASTERISK, // *
 	SLASH, // /
 	PERCENT, // %
-	EXCLAIM, // !
+	NOT, // !
+	NOT_EQUAL, // !=
+	TILDE, // ~
 	AMPERSAND, // &
 	PIPE, // |
 	HAT, // ^
@@ -60,7 +65,7 @@ TokenKind :: enum {
 	RSHIFT, // >>
 
 	// keywords
-	RETURN = 64,
+	RETURN = 128,
 	FOR,
 	WHILE,
 	IF,
@@ -189,9 +194,11 @@ next_token :: proc(t: ^Tokenizer) -> Token {
 
 	switch r {
 	case '!':
-		return make_token(t, TokenKind.EXCLAIM)
-	case '"':
-		return make_token(t, TokenKind.DQUOTE)
+		if peek(t) == '=' {
+			advance(t)
+			return make_token(t, TokenKind.NOT_EQUAL)
+		}
+		return make_token(t, TokenKind.NOT)
 	case '#':
 		return make_token(t, TokenKind.HASH)
 	case '$':
@@ -199,6 +206,10 @@ next_token :: proc(t: ^Tokenizer) -> Token {
 	case '%':
 		return make_token(t, TokenKind.PERCENT)
 	case '&':
+		if peek(t) == '&' {
+			advance(t)
+			return make_token(t, TokenKind.AND)
+		}
 		return make_token(t, TokenKind.AMPERSAND)
 	case '(':
 		return make_token(t, TokenKind.LPAREN)
@@ -221,17 +232,29 @@ next_token :: proc(t: ^Tokenizer) -> Token {
 	case ';':
 		return make_token(t, TokenKind.SEMICOLON)
 	case '=':
-		return make_token(t, TokenKind.EQUAL)
+		if peek(t) == '=' {
+			advance(t)
+			return make_token(t, TokenKind.EQUAL)
+		}
+		return make_token(t, TokenKind.ASSIGN)
 	case '<':
 		if peek(t) == '<' {
 			advance(t)
 			return make_token(t, TokenKind.LSHIFT)
 		}
+		if peek(t) == '=' {
+			advance(t)
+			return make_token(t, TokenKind.LESS_EQUAL)
+		}
 		return make_token(t, TokenKind.LESS)
 	case '>':
 		if peek(t) == '>' {
-            advance(t)
+			advance(t)
 			return make_token(t, TokenKind.RSHIFT)
+		}
+		if peek(t) == '=' {
+			advance(t)
+			return make_token(t, TokenKind.GREATER_EQUAL)
 		}
 		return make_token(t, TokenKind.GREATER)
 	case '[':

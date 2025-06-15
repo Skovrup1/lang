@@ -46,7 +46,7 @@ BitXorOp :: struct {
 	arg2:   Val,
 }
 
-NotOp :: struct {
+BitNotOp :: struct {
 	result: Val,
 	arg:    Val,
 }
@@ -102,9 +102,88 @@ ReturnOp :: struct {
 	arg: Val,
 }
 
+NotOp :: struct {
+	result: Val,
+	arg:    Val,
+}
+
+AndOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+AndAlsoOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+OrOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+OrElseOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+EqualOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+NotEqualOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+LessOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+LessEqualOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+GreaterOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+GreaterEqualOp :: struct {
+	result: Val,
+	arg1:   Val,
+	arg2:   Val,
+}
+
+LabelOp :: struct {
+}
+
+JmpIfNotZero :: struct {
+}
+
+JmpIfZeroOP :: struct {
+}
+
+JmpOP :: struct {
+}
+
+
 Tac :: union {
 	ProgOp,
 	FuncOp,
+	ReturnOp,
 	AddOp,
 	SubOp,
 	MulOp,
@@ -116,8 +195,20 @@ Tac :: union {
 	NegOp,
 	LShiftOp,
 	RShiftOp,
+	BitNotOp,
 	NotOp,
-	ReturnOp,
+	AndOp,
+	OrOp,
+	EqualOp,
+	LabelOp,
+	JmpIfNotZero,
+	JmpOP,
+	JmpIfZeroOP,
+	NotEqualOp,
+	LessOp,
+	LessEqualOp,
+	GreaterOp,
+	GreaterEqualOp,
 }
 
 Generator :: struct {
@@ -165,13 +256,19 @@ generate :: proc(g: ^Generator) -> [dynamic]Tac {
 			result := Var{make_tmp(g)}
 			arg := pop(&g.val_list)
 
-			append(&output, NotOp{result, arg})
+			append(&output, BitNotOp{result, arg})
 			append(&g.val_list, result)
 		case AstNegExpr:
 			result := Var{make_tmp(g)}
 			arg := pop(&g.val_list)
 
 			append(&output, NegOp{result, arg})
+			append(&g.val_list, result)
+		case AstNotExpr:
+			result := Var{make_tmp(g)}
+			arg := pop(&g.val_list)
+
+			append(&output, NotOp{result, arg})
 			append(&g.val_list, result)
 		case AstBitAndExpr:
 			result := Var{make_tmp(g)}
@@ -243,6 +340,22 @@ generate :: proc(g: ^Generator) -> [dynamic]Tac {
 
 			append(&output, RShiftOp{result, arg1, arg2})
 			append(&g.val_list, result)
+		case AstAndExpr:
+            panic("todo!")
+		case AstOrExpr:
+            panic("todo!")
+		case AstEqualExpr:
+            panic("todo!")
+		case AstNotEqualExpr:
+            panic("todo!")
+		case AstLessExpr:
+            panic("todo!")
+		case AstLessEqualExpr:
+            panic("todo!")
+		case AstGreaterExpr:
+            panic("todo!")
+		case AstGreaterEqualExpr:
+            panic("todo!")
 		case AstIntLiteral:
 			token := g.token_list[v.value]
 			str := cast(string)g.tokenizer.buf[token.start:token.end]
@@ -267,7 +380,7 @@ print_tacky_list :: proc(list: [dynamic]Tac, indent := 0) {
 			fmt.print(' ')
 		}
 
-		switch o in node {
+        #partial switch o in node {
 		case ProgOp:
 			print_tacky_list(o.func, indent)
 		case FuncOp:
@@ -276,6 +389,8 @@ print_tacky_list :: proc(list: [dynamic]Tac, indent := 0) {
 		case NegOp:
 			fmt.printfln("%v = -%v", o.result, o.arg)
 		case NotOp:
+			fmt.printfln("%v = !%v", o.result, o.arg)
+		case BitNotOp:
 			fmt.printfln("%v = ~%v", o.result, o.arg)
 		case BitAndOp:
 			fmt.printfln("%v = %v & %v", o.result, o.arg1, o.arg2)
@@ -297,6 +412,22 @@ print_tacky_list :: proc(list: [dynamic]Tac, indent := 0) {
 			fmt.printfln("%v = %v << %v", o.result, o.arg1, o.arg2)
 		case RShiftOp:
 			fmt.printfln("%v = %v >> %v", o.result, o.arg1, o.arg2)
+		case AndOp:
+			fmt.printfln("%v = %v and %v", o.result, o.arg1, o.arg2)
+		case OrOp:
+			fmt.printfln("%v = %v or %v", o.result, o.arg1, o.arg2)
+		case EqualOp:
+			fmt.printfln("%v = %v == %v", o.result, o.arg1, o.arg2)
+		case NotEqualOp:
+			fmt.printfln("%v = %v != %v", o.result, o.arg1, o.arg2)
+		case LessOp:
+			fmt.printfln("%v = %v < %v", o.result, o.arg1, o.arg2)
+		case LessEqualOp:
+			fmt.printfln("%v = %v <= %v", o.result, o.arg1, o.arg2)
+		case GreaterOp:
+			fmt.printfln("%v = %v > %v", o.result, o.arg1, o.arg2)
+		case GreaterEqualOp:
+			fmt.printfln("%v = %v >= %v", o.result, o.arg1, o.arg2)
 		case ReturnOp:
 			fmt.printfln("return %v", o.arg)
 		}
