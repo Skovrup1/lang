@@ -1,4 +1,4 @@
-package tokenizer
+package lexer
 
 import "core:fmt"
 
@@ -9,6 +9,8 @@ is_alpha :: proc(r: u8) -> bool {
 is_digit :: proc(r: u8) -> bool {
 	return r >= '0' && r <= '9'
 }
+
+TokenIndex :: int
 
 Tokenizer :: struct {
 	start:   int,
@@ -27,8 +29,6 @@ TokenKind :: enum {
 	FLOAT,
 	CHAR,
 	STRING,
-	TRUE,
-	FALSE,
 	// symbols
 	HASH, // #
 	DOLLAR, // $
@@ -48,6 +48,7 @@ TokenKind :: enum {
 	LESS_EQUAL, // <=
 	GREATER, // >
 	GREATER_EQUAL, // >=
+	INIT, // :=
 	ASSIGN, // =
 	EQUAL, // ==
 	PLUS, // +
@@ -72,6 +73,8 @@ TokenKind :: enum {
 	ELSE,
 	STRUCT,
 	I32,
+    TRUE,
+    FALSE,
 }
 
 Token :: struct {
@@ -139,7 +142,7 @@ skip_whitespace :: proc(t: ^Tokenizer) {
 identifier_type :: proc(t: ^Tokenizer) -> TokenKind {
 	str := t.buf[t.start:t.current]
 
-	keywords := [?]string{"return", "for", "while", "if", "else", "struct", "I32"}
+	keywords := [?]string{"return", "for", "while", "if", "else", "struct", "I32", "true", "false"}
 
 	for _, i in keywords {
 		if keywords[i] == transmute(string)str {
@@ -228,6 +231,10 @@ next_token :: proc(t: ^Tokenizer) -> Token {
 	case '/':
 		return make_token(t, TokenKind.SLASH)
 	case ':':
+		if peek(t) == '=' {
+			advance(t)
+			return make_token(t, TokenKind.INIT)
+		}
 		return make_token(t, TokenKind.COLON)
 	case ';':
 		return make_token(t, TokenKind.SEMICOLON)

@@ -6,179 +6,208 @@ import "core:strconv"
 import "../lexer"
 
 AstIndex :: int
-TokenIndex :: int
+INVALID_AST_INDEX: AstIndex : -1
 
-AstProgDef :: struct {
+ProgDef :: struct {
 	node: AstIndex,
 }
 
-AstFuncDef :: struct {
-	ident: TokenIndex,
+FuncDef :: struct {
+	ident: lexer.TokenIndex,
 	node:  AstIndex,
 }
 
-AstReturnStmt :: struct {
+BlockStmt :: struct {
+	stmts: [dynamic]AstIndex,
+}
+
+ReturnStmt :: struct {
 	node: AstIndex,
 }
 
-AstNotExpr :: struct {
+InitStmt :: struct {
+	ident: lexer.TokenIndex,
+	expr:  AstIndex,
+}
+
+AssignStmt :: struct {
+	ident: lexer.TokenIndex,
+	expr:  AstIndex,
+}
+
+VarExpr :: struct {
+	ident: lexer.TokenIndex,
+}
+
+IfExpr :: struct {
+	cond:       AstIndex,
+	then_block: AstIndex,
+	else_block: AstIndex,
+}
+
+NotExpr :: struct {
 	node: AstIndex,
 }
 
-AstNegExpr :: struct {
+NegExpr :: struct {
 	node: AstIndex,
 }
 
-AstBitNotExpr :: struct {
+BitNotExpr :: struct {
 	node: AstIndex,
 }
 
-AstParenExpr :: struct {
+ParenExpr :: struct {
 	node: AstIndex,
 }
 
-AstBitAndExpr :: struct {
+BitAndExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstBitOrExpr :: struct {
+BitOrExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstBitXorExpr :: struct {
+BitXorExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstMulExpr :: struct {
+MulExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstDivExpr :: struct {
+DivExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstModExpr :: struct {
+ModExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstAddExpr :: struct {
+AddExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstSubExpr :: struct {
+SubExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstLShiftExpr :: struct {
+LShiftExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstRShiftExpr :: struct {
+RShiftExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstAndExpr :: struct {
+AndExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstOrExpr :: struct {
+OrExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstEqualExpr :: struct {
+EqualExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstNotEqualExpr :: struct {
+NotEqualExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstLessExpr :: struct {
+LessExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstLessEqualExpr :: struct {
+LessEqualExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstGreaterExpr :: struct {
+GreaterExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstGreaterEqualExpr :: struct {
+GreaterEqualExpr :: struct {
 	left:  AstIndex,
 	right: AstIndex,
 }
 
-AstIntLiteral :: struct {
-	value: TokenIndex,
+IntLiteral :: struct {
+	value: lexer.TokenIndex,
 }
 
 Ast :: union {
 	// definitions
-	AstProgDef,
-	AstFuncDef,
+	ProgDef,
+	FuncDef,
 	// statements
-	AstReturnStmt,
+	BlockStmt,
+	ReturnStmt,
+	InitStmt,
+	AssignStmt,
 	// expressions
 	// unary
-	AstParenExpr,
-	AstNegExpr,
-	AstNotExpr,
-	AstBitNotExpr,
+	IfExpr,
+	ParenExpr,
+	NegExpr,
+	NotExpr,
+	BitNotExpr,
 	// binary
-	AstAndExpr,
-	AstOrExpr,
+	AndExpr,
+	OrExpr,
 	//AstXorExpr,
-	AstEqualExpr,
-	AstNotEqualExpr,
-	AstLessExpr,
-	AstLessEqualExpr,
-	AstGreaterExpr,
-	AstGreaterEqualExpr,
-	AstBitAndExpr,
-	AstBitOrExpr,
-	AstBitXorExpr,
-	AstLShiftExpr,
-	AstRShiftExpr,
-	AstMulExpr,
-	AstDivExpr,
-	AstModExpr,
-	AstAddExpr,
-	AstSubExpr,
+	EqualExpr,
+	NotEqualExpr,
+	LessExpr,
+	LessEqualExpr,
+	GreaterExpr,
+	GreaterEqualExpr,
+	BitAndExpr,
+	BitOrExpr,
+	BitXorExpr,
+	LShiftExpr,
+	RShiftExpr,
+	MulExpr,
+	DivExpr,
+	ModExpr,
+	AddExpr,
+	SubExpr,
 	// literals
-	AstIntLiteral,
+	IntLiteral,
+	VarExpr,
 }
 
 Parser :: struct {
-	current:    TokenIndex,
-	previous:   TokenIndex,
-	list:       [dynamic]Ast,
-	tokenizer:  lexer.Tokenizer,
+	current:    lexer.TokenIndex,
+	previous:   lexer.TokenIndex,
+	source:     []u8,
 	token_list: [dynamic]lexer.Token,
+	list:       [dynamic]Ast,
 }
 
-make_parser :: proc(tokenizer: lexer.Tokenizer, token_list: [dynamic]lexer.Token) -> Parser {
+make_parser :: proc(source: []u8, token_list: [dynamic]lexer.Token) -> Parser {
 	list: [dynamic]Ast
 
-	return Parser{0, 0, list, tokenizer, token_list}
+	return Parser{0, 0, source, token_list, list}
 }
 
 parse :: proc(p: ^Parser) -> [dynamic]Ast {
@@ -189,7 +218,7 @@ parse :: proc(p: ^Parser) -> [dynamic]Ast {
 
 parse_program :: proc(p: ^Parser) {
 	func := parse_function(p)
-	append(&p.list, AstProgDef{node = func})
+	append(&p.list, ProgDef{node = func})
 }
 
 parse_function :: proc(p: ^Parser) -> AstIndex {
@@ -204,21 +233,47 @@ parse_function :: proc(p: ^Parser) -> AstIndex {
 	expect(p, .I32)
 
 	stmt := parse_statement(p)
-	append(&p.list, AstFuncDef{ident = ident_i, node = stmt})
+	append(&p.list, FuncDef{ident = ident_i, node = stmt})
 
 	return len(p.list) - 1
 }
 
 parse_statement :: proc(p: ^Parser) -> AstIndex {
-	expect(p, .LBRACE)
-	expect(p, .RETURN)
-
-	expr := parse_expression(p)
-
-	expect(p, .SEMICOLON)
-	expect(p, .RBRACE)
-
-	append(&p.list, AstReturnStmt{node = expr})
+	#partial switch peek(p) {
+	case .LBRACE:
+		advance(p)
+		// this is likely wrong, what happens if temp allocator frees itself
+		stmts := make([dynamic]AstIndex, 0, 4, context.temp_allocator)
+		for peek(p) != .RBRACE {
+			stmt := parse_statement(p)
+			append(&stmts, stmt)
+		}
+		advance(p) // has to be .RBRACE
+		append(&p.list, BlockStmt{stmts})
+	case .IDENTIFIER:
+		#partial switch peek_next(p) {
+		case .INIT:
+			ident := p.current
+			advance(p)
+			advance(p)
+			expr := parse_expression(p)
+			append(&p.list, InitStmt{ident, expr})
+		case .ASSIGN:
+			ident := p.current
+			advance(p)
+			advance(p)
+			expr := parse_expression(p)
+			append(&p.list, AssignStmt{ident, expr})
+		}
+	case .RETURN:
+		advance(p)
+		expr := parse_expression(p)
+		append(&p.list, ReturnStmt{node = expr})
+		expect(p, .SEMICOLON)
+	case:
+		expr := parse_expression(p)
+		option(p, .SEMICOLON) // is this needed?
+	}
 
 	return len(p.list) - 1
 }
@@ -235,7 +290,7 @@ parse_logical_or :: proc(p: ^Parser) -> AstIndex {
 		advance(p)
 
 		right := parse_logical_and(p)
-		append(&p.list, AstOrExpr{left = left, right = right})
+		append(&p.list, OrExpr{left = left, right = right})
 		left = len(p.list) - 1
 	}
 
@@ -250,7 +305,7 @@ parse_logical_and :: proc(p: ^Parser) -> AstIndex {
 		advance(p)
 
 		right := parse_equality(p)
-		append(&p.list, AstAndExpr{left = left, right = right})
+		append(&p.list, AndExpr{left = left, right = right})
 		left = len(p.list) - 1
 	}
 
@@ -267,9 +322,9 @@ parse_equality :: proc(p: ^Parser) -> AstIndex {
 		right := parse_comparison(p)
 		#partial switch op {
 		case .EQUAL:
-			append(&p.list, AstEqualExpr{left = left, right = right})
+			append(&p.list, EqualExpr{left = left, right = right})
 		case .NOT_EQUAL:
-			append(&p.list, AstNotEqualExpr{left = left, right = right})
+			append(&p.list, NotEqualExpr{left = left, right = right})
 		}
 
 		left = len(p.list) - 1
@@ -291,13 +346,13 @@ parse_comparison :: proc(p: ^Parser) -> AstIndex {
 		right := parse_term(p)
 		#partial switch op {
 		case .LESS:
-			append(&p.list, AstLessExpr{left = left, right = right})
+			append(&p.list, LessExpr{left = left, right = right})
 		case .LESS_EQUAL:
-			append(&p.list, AstLessEqualExpr{left = left, right = right})
+			append(&p.list, LessEqualExpr{left = left, right = right})
 		case .GREATER:
-			append(&p.list, AstGreaterExpr{left = left, right = right})
+			append(&p.list, GreaterExpr{left = left, right = right})
 		case .GREATER_EQUAL:
-			append(&p.list, AstGreaterEqualExpr{left = left, right = right})
+			append(&p.list, GreaterEqualExpr{left = left, right = right})
 		}
 
 		left = len(p.list) - 1
@@ -316,9 +371,9 @@ parse_term :: proc(p: ^Parser) -> AstIndex {
 		right := parse_factor(p)
 		#partial switch op {
 		case .PLUS:
-			append(&p.list, AstAddExpr{left = left, right = right})
+			append(&p.list, AddExpr{left = left, right = right})
 		case .MINUS:
-			append(&p.list, AstSubExpr{left = left, right = right})
+			append(&p.list, SubExpr{left = left, right = right})
 		}
 
 		left = len(p.list) - 1
@@ -344,60 +399,80 @@ parse_factor :: proc(p: ^Parser) -> AstIndex {
 		right := parse_primary(p)
 		#partial switch op {
 		case .ASTERISK:
-			append(&p.list, AstMulExpr{left = left, right = right})
+			append(&p.list, MulExpr{left = left, right = right})
 		case .SLASH:
-			append(&p.list, AstDivExpr{left = left, right = right})
+			append(&p.list, DivExpr{left = left, right = right})
 		case .PERCENT:
-			append(&p.list, AstModExpr{left = left, right = right})
+			append(&p.list, ModExpr{left = left, right = right})
 		case .LSHIFT:
-			append(&p.list, AstLShiftExpr{left = left, right = right})
+			append(&p.list, LShiftExpr{left = left, right = right})
 		case .RSHIFT:
-			append(&p.list, AstRShiftExpr{left = left, right = right})
+			append(&p.list, RShiftExpr{left = left, right = right})
 		case .AMPERSAND:
-			append(&p.list, AstBitAndExpr{left = left, right = right})
+			append(&p.list, BitAndExpr{left = left, right = right})
 		case .PIPE:
-			append(&p.list, AstBitOrExpr{left = left, right = right})
+			append(&p.list, BitOrExpr{left = left, right = right})
 		case .HAT:
-			append(&p.list, AstBitXorExpr{left = left, right = right})
+			append(&p.list, BitXorExpr{left = left, right = right})
 		}
+
 		left = len(p.list) - 1
 	}
 
 	return left
 }
 
+parse_if_expr :: proc(p: ^Parser) -> AstIndex {
+	expect(p, .IF)
+	cond := parse_expression(p)
+	then_block := parse_statement(p)
+	else_block := INVALID_AST_INDEX
+	if peek(p) == .ELSE {
+		advance(p)
+		else_block = parse_statement(p)
+	}
+	append(&p.list, IfExpr{cond, then_block, else_block})
+	return len(p.list) - 1
+}
+
 parse_primary :: proc(p: ^Parser) -> AstIndex {
 	#partial switch peek(p) {
+	case .IDENTIFIER:
+		advance(p)
+		append(&p.list, VarExpr{ident = p.previous})
+		return len(p.list) - 1
 	case .INTEGER:
 		advance(p)
-		append(&p.list, AstIntLiteral{value = p.previous})
+		append(&p.list, IntLiteral{value = p.previous})
 
 		return len(p.list) - 1
 	case .LPAREN:
 		advance(p)
 		expr := parse_expression(p)
 		expect(p, .RPAREN)
-		append(&p.list, AstParenExpr{node = expr})
+		append(&p.list, ParenExpr{node = expr})
 
 		return len(p.list) - 1
 	case .NOT:
 		advance(p)
 		op := parse_primary(p)
-		append(&p.list, AstNotExpr{node = op})
+		append(&p.list, NotExpr{node = op})
 
 		return len(p.list) - 1
 	case .TILDE:
 		advance(p)
 		op := parse_primary(p)
-		append(&p.list, AstBitNotExpr{node = op})
+		append(&p.list, BitNotExpr{node = op})
 
 		return len(p.list) - 1
 	case .MINUS:
 		advance(p)
 		op := parse_primary(p)
-		append(&p.list, AstNegExpr{node = op})
+		append(&p.list, NegExpr{node = op})
 
 		return len(p.list) - 1
+	case .IF:
+		return parse_if_expr(p)
 	}
 
 	panic(fmt.tprintf("peek() = %v", peek(p)))
@@ -412,134 +487,175 @@ peek :: proc(p: ^Parser) -> lexer.TokenKind {
 	return p.token_list[p.current].kind
 }
 
-expect :: proc(p: ^Parser, expected: lexer.TokenKind) {
+peek_next :: proc(p: ^Parser) -> lexer.TokenKind {
+	return p.token_list[p.current + 1].kind
+}
+
+expect :: proc(p: ^Parser, expected: lexer.TokenKind, loc := #caller_location) {
 	actual := p.token_list[p.current].kind
 
 	if actual != expected {
-		msg := fmt.aprintf("expected %s, got %s", expected, actual)
+		msg := fmt.aprintf("expected %s, got %s, at %s", expected, actual, loc)
 		panic(msg)
 	}
 
 	advance(p)
 }
 
-print_ast :: proc(ast_list: [dynamic]Ast, indent: int = 0) {
-	print_spaces :: proc(n: int) {
-		for i in 0 ..< n {
-			fmt.print(' ')
-		}
+option :: proc(p: ^Parser, expected: lexer.TokenKind) -> bool {
+	if peek(p) == expected {
+		advance(p)
+		return true
 	}
+	return false
+}
 
-	print_node :: proc(list: [dynamic]Ast, index: AstIndex, indent: int) {
-		if index < 0 || index >= len(list) {
-			print_spaces(indent)
-			fmt.println("<invalid ast index>")
-			return
-		}
+print_spaces :: proc(n: int) {
+	for i in 0 ..< n {
+		fmt.print(' ')
+	}
+}
 
-		node := list[index]
+print_node :: proc(p: ^Parser, list: [dynamic]Ast, index: AstIndex, indent: int) {
+	if index < 0 || index >= len(list) {
 		print_spaces(indent)
+		fmt.println("<invalid ast index>")
+		return
+	}
 
-		switch v in node {
-		case AstProgDef:
-			fmt.println("AstProgDef")
-			print_node(list, v.node, indent + 2)
-		case AstFuncDef:
-			fmt.printfln("AstFuncDef")
-			print_node(list, v.node, indent + 2)
-		case AstReturnStmt:
-			fmt.println("AstReturnStmt")
-			print_node(list, v.node, indent + 2)
-		case AstNotExpr:
-            fmt.println("AstNotExpr")
-			print_node(list, v.node, indent + 2)
-		case AstBitNotExpr:
-			fmt.println("AstBitNotExpr")
-			print_node(list, v.node, indent + 2)
-		case AstNegExpr:
-			fmt.println("AstNegExpr")
-			print_node(list, v.node, indent + 2)
-		case AstParenExpr:
-			fmt.println("AstParenExpr")
-			print_node(list, v.node, indent + 2)
-		case AstBitAndExpr:
-			fmt.println("AstBitAndExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstBitOrExpr:
-			fmt.println("AstBitOrExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstBitXorExpr:
-			fmt.println("AstBitXorExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstMulExpr:
-			fmt.println("AstMulExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstDivExpr:
-			fmt.println("AstDivExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstModExpr:
-			fmt.println("AstModExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstAddExpr:
-			fmt.println("AstAddExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstSubExpr:
-			fmt.println("AstSubExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstLShiftExpr:
-			fmt.println("AstLShiftExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstRShiftExpr:
-			fmt.println("AstLShiftExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstAndExpr:
-            fmt.println("AstAndExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstOrExpr:
-            fmt.println("AstOrExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstEqualExpr:
-            fmt.println("AstEqualExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstNotEqualExpr:
-            fmt.println("AstNotEqualExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstLessExpr:
-            fmt.println("AstLessExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstLessEqualExpr:
-            fmt.println("AstLessEqualExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstGreaterExpr:
-            fmt.println("AstGreaterExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstGreaterEqualExpr:
-            fmt.println("AstGreaterEqualExpr")
-			print_node(list, v.left, indent + 2)
-			print_node(list, v.right, indent + 2)
-		case AstIntLiteral:
-			fmt.printfln("AstIntLiteral")
+	node := list[index]
+	print_spaces(indent)
+
+	switch v in node {
+	case ProgDef:
+		fmt.println("ProgDef")
+		print_node(p, list, v.node, indent + 2)
+	case FuncDef:
+		fmt.printfln("FuncDef")
+		print_node(p, list, v.node, indent + 2)
+	case BlockStmt:
+		fmt.println("BlockStmt")
+		for stmt in v.stmts {
+			print_node(p, list, stmt, indent + 2)
 		}
+	case InitStmt:
+		fmt.println("InitStmt")
+		/*print_spaces(indent + 2)
+		token := p.token_list[v.ident]
+		ident := cast(string)p.source[token.start:token.end]
+		fmt.printf("ident = %v\n", ident)
+        */
+		print_node(p, list, v.expr, indent + 2)
+	case AssignStmt:
+		fmt.println("ReturnStmt")
+		print_spaces(indent + 2)
+		fmt.println(v.ident)
+		print_node(p, list, v.expr, indent + 2)
+	case ReturnStmt:
+		fmt.println("ReturnStmt")
+		print_node(p, list, v.node, indent + 2)
+	case IfExpr:
+		fmt.println("IfExpr")
+		print_node(p, list, v.cond, indent + 2)
+		print_node(p, list, v.then_block, indent + 2)
+		if v.else_block != INVALID_AST_INDEX {
+			print_node(p, list, v.else_block, indent + 2)
+		}
+	case NotExpr:
+		fmt.println("NotExpr")
+		print_node(p, list, v.node, indent + 2)
+	case BitNotExpr:
+		fmt.println("BitNotExpr")
+		print_node(p, list, v.node, indent + 2)
+	case NegExpr:
+		fmt.println("NegExpr")
+		print_node(p, list, v.node, indent + 2)
+	case ParenExpr:
+		fmt.println("ParenExpr")
+		print_node(p, list, v.node, indent + 2)
+	case BitAndExpr:
+		fmt.println("BitAndExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case BitOrExpr:
+		fmt.println("BitOrExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case BitXorExpr:
+		fmt.println("BitXorExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case MulExpr:
+		fmt.println("MulExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case DivExpr:
+		fmt.println("DivExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case ModExpr:
+		fmt.println("ModExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case AddExpr:
+		fmt.println("AddExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case SubExpr:
+		fmt.println("SubExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case LShiftExpr:
+		fmt.println("LShiftExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case RShiftExpr:
+		fmt.println("LShiftExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case AndExpr:
+		fmt.println("AndExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case OrExpr:
+		fmt.println("OrExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case EqualExpr:
+		fmt.println("EqualExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case NotEqualExpr:
+		fmt.println("NotEqualExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case LessExpr:
+		fmt.println("LessExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case LessEqualExpr:
+		fmt.println("LessEqualExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case GreaterExpr:
+		fmt.println("GreaterExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case GreaterEqualExpr:
+		fmt.println("GreaterEqualExpr")
+		print_node(p, list, v.left, indent + 2)
+		print_node(p, list, v.right, indent + 2)
+	case IntLiteral:
+		fmt.printfln("IntLiteral")
+	case VarExpr:
+		fmt.printfln("VarExpr")
 	}
 
+}
+
+print_ast :: proc(p: ^Parser, ast_list: [dynamic]Ast, indent: int = 0) {
 	if len(ast_list) > 0 {
-		print_node(ast_list, len(ast_list) - 1, indent) // start from the root
+		print_node(p, ast_list, len(ast_list) - 1, indent) // start from the root
 	}
+	fmt.println()
 }

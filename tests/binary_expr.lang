@@ -1,3 +1,4 @@
 main :: () -> I32 {
-    return 1 && 0;
+    x := 2
+    return x;
 }

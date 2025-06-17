@@ -1,4 +1,4 @@
-package emit
+package emitter
 
 import "../asmGen"
 
