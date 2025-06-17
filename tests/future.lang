@@ -1,0 +1,23 @@
+map := (xs: []s32, op: s32 -> s32) {
+    for i = 0; i < len(xs); i += 1 {
+        xs[i] = op(xs[i])
+    }
+}
+
+to_ssa := (a_list: List(ANode), t_list: List(Token), source: []u8) -> List(SNode) {
+    out := make(List(SNode))
+
+    for node := 0..len(a_list) {
+        match node.tag {
+            ProgDef => {
+
+            }
+            FuncDef => {
+
+            }
+            AddExpr => {
+
+            }
+        }
+    }
+}

@@ -1,0 +1,7 @@
+main :: () -> I32 {
+    x := 0;
+    while x < 10 {
+        x = x + 2;
+    }
+    return x;
+}
