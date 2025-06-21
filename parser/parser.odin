@@ -241,38 +241,39 @@ parse_function :: proc(p: ^Parser) -> AstIndex {
 parse_statement :: proc(p: ^Parser) -> AstIndex {
 	#partial switch peek(p) {
 	case .LBRACE:
-		advance(p)
+		advance(p) // consume LBRACE
 		// this is likely wrong, what happens if temp allocator frees itself
 		stmts := make([dynamic]AstIndex, 0, 4, context.temp_allocator)
 		for peek(p) != .RBRACE {
 			stmt := parse_statement(p)
 			append(&stmts, stmt)
 		}
-		advance(p) // has to be .RBRACE
+		advance(p) // consume RBRACE
 		append(&p.list, BlockStmt{stmts})
 	case .IDENTIFIER:
 		#partial switch peek_next(p) {
 		case .INIT:
 			ident := p.current
-			advance(p)
-			advance(p)
+			advance(p) // consume IDENTIFIER
+			advance(p) // consume INIT
 			expr := parse_expression(p)
 			append(&p.list, InitStmt{ident, expr})
+			expect(p, .SEMICOLON)
 		case .ASSIGN:
 			ident := p.current
-			advance(p)
-			advance(p)
+			advance(p) // consume IDENTIFIER
+			advance(p) // consume ASSIGN
 			expr := parse_expression(p)
 			append(&p.list, AssignStmt{ident, expr})
+			expect(p, .SEMICOLON)
 		}
 	case .RETURN:
-		advance(p)
+		advance(p) // consume RETURN
 		expr := parse_expression(p)
 		append(&p.list, ReturnStmt{node = expr})
 		expect(p, .SEMICOLON)
 	case:
 		expr := parse_expression(p)
-		option(p, .SEMICOLON) // is this needed?
 	}
 
 	return len(p.list) - 1
@@ -444,32 +445,27 @@ parse_primary :: proc(p: ^Parser) -> AstIndex {
 	case .INTEGER:
 		advance(p)
 		append(&p.list, IntLiteral{value = p.previous})
-
 		return len(p.list) - 1
 	case .LPAREN:
 		advance(p)
 		expr := parse_expression(p)
 		expect(p, .RPAREN)
 		append(&p.list, ParenExpr{node = expr})
-
 		return len(p.list) - 1
 	case .NOT:
 		advance(p)
 		op := parse_primary(p)
 		append(&p.list, NotExpr{node = op})
-
 		return len(p.list) - 1
 	case .TILDE:
 		advance(p)
 		op := parse_primary(p)
 		append(&p.list, BitNotExpr{node = op})
-
 		return len(p.list) - 1
 	case .MINUS:
 		advance(p)
 		op := parse_primary(p)
 		append(&p.list, NegExpr{node = op})
-
 		return len(p.list) - 1
 	case .IF:
 		return parse_if_expr(p)
@@ -540,16 +536,17 @@ print_node :: proc(p: ^Parser, list: [dynamic]Ast, index: AstIndex, indent: int)
 		}
 	case InitStmt:
 		fmt.println("InitStmt")
-		/*print_spaces(indent + 2)
+		print_spaces(indent + 2)
 		token := p.token_list[v.ident]
 		ident := cast(string)p.source[token.start:token.end]
 		fmt.printf("ident = %v\n", ident)
-        */
 		print_node(p, list, v.expr, indent + 2)
 	case AssignStmt:
-		fmt.println("ReturnStmt")
+		fmt.println("AssignStmt")
 		print_spaces(indent + 2)
-		fmt.println(v.ident)
+		token := p.token_list[v.ident]
+		ident := cast(string)p.source[token.start:token.end]
+		fmt.printf("ident = %v\n", ident)
 		print_node(p, list, v.expr, indent + 2)
 	case ReturnStmt:
 		fmt.println("ReturnStmt")

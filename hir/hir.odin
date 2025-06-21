@@ -32,7 +32,10 @@ Instruction :: struct {
 		Neg,
 		Add,
 		Equal,
+		Init,
+		Assign,
 		Constant,
+		Undef,
 	},
 	data: union #no_nil {
 		Constant,
@@ -92,6 +95,8 @@ Converter :: struct {
 
 	// maps an ast node to the ssa value it produced.
 	ast_to_value:        map[parser.AstIndex]Value,
+	// symbol table
+	var_to_value:        map[string]Value,
 }
 
 lookup :: proc(c: ^Converter, value: lexer.TokenIndex) -> int {
@@ -101,6 +106,11 @@ lookup :: proc(c: ^Converter, value: lexer.TokenIndex) -> int {
 	assert(ok, "failed to parse int")
 
 	return value
+}
+
+get_var_name :: proc(c: ^Converter, ident: lexer.TokenIndex) -> string {
+	token := c.tokens[ident]
+	return string(c.source[token.start:token.end])
 }
 
 new_value :: proc(c: ^Converter) -> Value {
@@ -156,6 +166,7 @@ convert_node :: proc(c: ^Converter, node_index: parser.AstIndex) -> (val: Value,
 	case parser.BlockStmt:
 		last_val: Value
 		has_value := false
+
 		for stmt in n.stmts {
 			v, ok := convert_node(c, stmt)
 			if ok {
@@ -163,65 +174,104 @@ convert_node :: proc(c: ^Converter, node_index: parser.AstIndex) -> (val: Value,
 				has_value = true
 			}
 		}
+
 		if has_value {
 			c.ast_to_value[node_index] = last_val
 			return last_val, true
 		}
+
 		return {}, false
 
-	case parser.IfExpr:
-		entry_block := c.current_block
+	case parser.InitStmt:
+		dst_val := new_value(c)
+		src_val, ok := convert_node(c, n.expr)
+		if !ok {return {}, false}
 
+		init_inst := Instruction{.Init, Unary{dst_val, src_val}}
+		append(&c.current_block.instructions, init_inst)
+
+		c.ast_to_value[node_index] = dst_val
+
+		ident := get_var_name(c, n.ident)
+		c.var_to_value[ident] = dst_val
+
+		return dst_val, true
+
+	case parser.AssignStmt:
+		dst_val := new_value(c)
+		src_val, ok := convert_node(c, n.expr)
+		if !ok {return {}, false}
+
+		assign_inst := Instruction{.Assign, Unary{dst_val, src_val}}
+		append(&c.current_block.instructions, assign_inst)
+
+		c.ast_to_value[node_index] = dst_val
+
+		ident := get_var_name(c, n.ident)
+		c.var_to_value[ident] = dst_val
+
+		return dst_val, true
+
+	case parser.VarExpr:
+		var_name := get_var_name(c, n.ident)
+
+		if val, ok := c.var_to_value[var_name]; ok {
+			c.ast_to_value[node_index] = val
+			return val, true
+		}
+
+		panic(fmt.tprintf("undefined variable: %s", var_name))
+
+	case parser.IfExpr:
 		cond_val, cond_ok := convert_node(c, n.cond)
 		if !cond_ok {return {}, false}
 
 		then_block := new_basic_block(c)
-		else_block: ^BasicBlock = new_basic_block(c)
-		merge_block: ^BasicBlock = new_basic_block(c)
+		else_block := new_basic_block(c)
+		merge_block := new_basic_block(c)
 
-		// set up entry to condition block
+		entry_block := c.current_block
 		entry_block.terminator = BranchCond {
-			cond       = cond_val,
-			true_dst   = then_block.label,
-			true_args  = make([dynamic]Value, 0, 0),
-			false_dst  = else_block.label,
-			false_args = make([dynamic]Value, 0, 0),
+			cond      = cond_val,
+			true_dst  = then_block.label,
+			false_dst = else_block.label,
 		}
 
-		// then block
 		c.current_block = then_block
 		then_val, then_ok := convert_node(c, n.then_block)
 		if !then_ok {return {}, false}
-		then_block.terminator = BranchUncond {
-			dst  = merge_block.label,
-			args = make([dynamic]Value, 0, 1),
-		}
-		then_branch := then_block.terminator.(BranchUncond)
-		append(&then_branch.args, then_val)
-		then_block.terminator = then_branch
 
-		// else block
+		if then_block.terminator == nil {
+			then_block.terminator = BranchUncond {
+				dst  = merge_block.label,
+				args = make([dynamic]Value, 0, 0),
+			}
+		}
+		then_terminator := then_block.terminator.(BranchUncond)
+		append(&then_terminator.args, then_val)
+		then_block.terminator = then_terminator
+
 		c.current_block = else_block
 		else_val, else_ok := convert_node(c, n.else_block)
 		if !else_ok {return {}, false}
-		else_block.terminator = BranchUncond {
-			dst  = merge_block.label,
-			args = make([dynamic]Value, 0, 1),
+
+		if else_block.terminator == nil {
+			else_block.terminator = BranchUncond {
+				dst  = merge_block.label,
+				args = make([dynamic]Value, 0, 0),
+			}
 		}
-		else_branch := else_block.terminator.(BranchUncond)
-		append(&else_branch.args, else_val)
-		else_block.terminator = else_branch
 
-		// merge block
+		else_terminator := else_block.terminator.(BranchUncond)
+		append(&else_terminator.args, else_val)
+		else_block.terminator = else_terminator
+
 		c.current_block = merge_block
-		merge_val := new_value(c)
-		append(&merge_block.args, merge_val)
 
-		// note: temporary hack
-		merge_block.terminator = Return{merge_val}
+		dst_val := new_value(c)
+		append(&merge_block.args, dst_val)
 
-		c.ast_to_value[node_index] = merge_val
-		return merge_val, true
+		return dst_val, true
 
 	case parser.NegExpr:
 		arg_val, arg_ok := convert_node(c, n.node)
@@ -291,7 +341,7 @@ print_function :: proc(f: ^Function) {
 				const_inst := inst.data.(Constant)
 				fmt.printf("  %%%v = const %v\n", const_inst.dst, const_inst.value)
 
-			case .Neg:
+			case .Neg, .Init, .Assign, .Undef:
 				unary_inst := inst.data.(Unary)
 				tag_name, _ := fmt.enum_value_to_string(inst.tag)
 				tag_name = strings.to_lower(tag_name)
@@ -302,10 +352,10 @@ print_function :: proc(f: ^Function) {
 				tag_name, _ := fmt.enum_value_to_string(inst.tag)
 				tag_name = strings.to_lower(tag_name)
 				fmt.printf(
-					"  %%%v = %%%v %v %%%v\n",
+					"  %%%v = %v %%%v %%%v\n",
 					binary_inst.dst,
-					binary_inst.lhs,
 					tag_name,
+					binary_inst.lhs,
 					binary_inst.rhs,
 				)
 			}
