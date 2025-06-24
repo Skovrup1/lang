@@ -20,7 +20,6 @@ NodeKind :: enum i32 {
 	AssignStmt,
 	IntExpr,
 	VarExpr,
-	ParenExpr,
 	MulExpr,
 	//DivExpr,
 	//ModExpr,
@@ -132,7 +131,7 @@ parse_statement :: proc(p: ^Parser) -> NodeIndex {
 		for peek(p) != .RBrace {
 			append(&p.extra_data, parse_statement(p))
 		}
-        last := NodeIndex(len(p.extra_data) - 1)
+		last := NodeIndex(len(p.extra_data) - 1)
 		advance(p) // }
 		append(&p.nodes, Node{.BlockStmt, token, {first, last}})
 	case .If:
@@ -267,7 +266,6 @@ parse_primary :: proc(p: ^Parser) -> NodeIndex {
 		token := p.previous
 		expr := parse_expression(p)
 		expect(p, .RParen)
-		append(&p.nodes, Node{.ParenExpr, token, {expr, INVALID_NODE}})
 	case .Minus:
 		advance(p)
 		token := p.previous
@@ -300,10 +298,10 @@ print_ast :: proc(p: ^Parser, indent: int = 0) {
 			fmt.printf("BlockStmt\n")
 			first := node.data.lhs
 			last := node.data.rhs
-            for i in first..<last {
-                stmt_index := p.extra_data[i]
-                print_node(p, stmt_index, indent + 2)
-            }
+			for i in first ..< last {
+				stmt_index := p.extra_data[i]
+				print_node(p, stmt_index, indent + 2)
+			}
 		case .ReturnStmt:
 			fmt.printf("ReturnStmt\n")
 			print_node(p, node.data.lhs, indent + 2)
