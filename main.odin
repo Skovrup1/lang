@@ -1,6 +1,5 @@
 package main
 
-import "hir"
 import "lexer"
 import "parser"
 
@@ -28,17 +27,17 @@ main :: proc() {
 		os.exit(1)
 	}
 
-	buf, read_err := os.read_entire_file_from_handle_or_err(handle)
-	defer delete(buf)
+	source, read_err := os.read_entire_file_from_handle_or_err(handle)
+	defer delete(source)
 
 	if read_err != os.ERROR_NONE {
 		fmt.eprintf("failed to read file: %v\n", read_err)
 		os.exit(1)
 	}
 
-	fmt.println(cast(string)buf)
+	fmt.println(cast(string)source)
 
-	t := lexer.make_tokenizer(buf)
+	t := lexer.make_tokenizer(source)
 	token_list := lexer.tokenize(&t)
 
 	for token in token_list {
@@ -46,20 +45,12 @@ main :: proc() {
 	}
 	fmt.println()
 
-	p := parser.make_parser(buf, token_list)
-	ast_list := parser.parse(&p)
+	p := parser.make_parser(source, token_list)
+	nodes := parser.parse(&p)
 
-	parser.print_ast(&p, ast_list)
-
-	c := hir.Converter {
-		source       = buf,
-		tokens       = token_list[:],
-		ast          = ast_list[:],
-		ast_to_value = make(map[parser.AstIndex]hir.Value),
-		function     = new(hir.Function),
+	for node in nodes {
+		fmt.println(node)
 	}
 
-	hir.convert_node(&c, parser.AstIndex(len(ast_list) - 1))
-
-	hir.print_function(c.function)
+	parser.print_ast(&p)
 }

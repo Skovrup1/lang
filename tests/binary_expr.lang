@@ -1,11 +1,5 @@
 main :: () -> I32 {
-    x := 1;
-
-    if 2 == 3 {
-        x = 4;
-    } else {
-        x = 5;
-    }
-
-    return x;
+    x := 1
+    x = 2
+    return (x + 3) * 4;
 }

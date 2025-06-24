@@ -2,85 +2,76 @@ package lexer
 
 import "core:fmt"
 
-is_alpha :: proc(r: u8) -> bool {
-	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '_'
-}
-
-is_digit :: proc(r: u8) -> bool {
-	return r >= '0' && r <= '9'
-}
-
-TokenIndex :: int
+TokenIndex :: distinct i32
 
 Tokenizer :: struct {
 	start:   int,
 	current: int,
 	line:    int,
-	buf:     []u8,
+	source:  []u8,
 }
 
-TokenKind :: enum {
-	NULL = 0,
-	EOF,
-	ERROR,
+TokenKind :: enum i32 {
+	Null = 0,
+	Eof,
+	Error,
 	// literals
-	IDENTIFIER,
-	INTEGER,
-	FLOAT,
-	CHAR,
-	STRING,
+	Identifier,
+	Integer,
+	Float,
+	Char,
+	String,
 	// symbols
-	HASH, // #
-	DOLLAR, // $
-	COMMA, // ,
-	PERIOD, // .
-	COLON, // :
-	SEMICOLON, // ;
-	LPAREN, // (
-	RPAREN, // )
-	LBRACKET, // [
-	RBRACKET, // ]
-	LBRACE, // {
-	RBRACE, // }
-	OR, // ||
-	AND, // &&
-	LESS, // <
-	LESS_EQUAL, // <=
-	GREATER, // >
-	GREATER_EQUAL, // >=
-	INIT, // :=
-	ASSIGN, // =
-	EQUAL, // ==
-	PLUS, // +
-	MINUS, // -
-	ASTERISK, // *
-	SLASH, // /
-	PERCENT, // %
-	NOT, // !
-	NOT_EQUAL, // !=
-	TILDE, // ~
-	AMPERSAND, // &
-	PIPE, // |
-	HAT, // ^
-	LSHIFT, // <<
-	RSHIFT, // >>
+	Hash, // #
+	Dollar, // $
+	Comma, // ,
+	Period, // .
+	Colon, // :
+	Semicolon, // ;
+	LParen, // (
+	RParen, // )
+	LBracket, // [
+	RBracket, // ]
+	LBrace, // {
+	RBrace, // }
+	Or, // ||
+	And, // &&
+	Less, // <
+	LessEqual, // <=
+	Greater, // >
+	GreaterEqual, // >=
+	Init, // :=
+	Assign, // =
+	Equal, // ==
+	Plus, // +
+	Minus, // -
+	Asterisk, // *
+	Slash, // /
+	Percent, // %
+	Not, // !
+	NotEqual, // !=
+	Tilde, // ~
+	Ampersand, // &
+	Pipe, // |
+	Hat, // ^
+	LShift, // <<
+	RShift, // >>
 
 	// keywords
-	RETURN = 128,
-	FOR,
-	WHILE,
-	IF,
-	ELSE,
-	STRUCT,
+	Return = 64,
+	For,
+	While,
+	If,
+	Else,
+	Struct,
 	I32,
-    TRUE,
-    FALSE,
+	True,
+	False,
 }
 
 Token :: struct {
 	kind:  TokenKind,
-	start: int,
-	end:   int,
+	start: TokenIndex,
 }
 
 make_tokenizer :: proc(buf: []u8, start := 0, current := 0, line := 1) -> Tokenizer {
@@ -88,7 +79,7 @@ make_tokenizer :: proc(buf: []u8, start := 0, current := 0, line := 1) -> Tokeni
 }
 
 make_token :: proc(t: ^Tokenizer, kind: TokenKind) -> Token {
-	return Token{kind, t.start, t.current}
+	return Token{kind, TokenIndex(t.start)}
 }
 
 peek :: proc(t: ^Tokenizer) -> u8 {
@@ -96,7 +87,7 @@ peek :: proc(t: ^Tokenizer) -> u8 {
 		return 0
 	}
 
-	return t.buf[t.current]
+	return t.source[t.current]
 }
 
 peek_next :: proc(t: ^Tokenizer) -> u8 {
@@ -104,16 +95,16 @@ peek_next :: proc(t: ^Tokenizer) -> u8 {
 		return 0
 	}
 
-	return t.buf[t.current + 1]
+	return t.source[t.current + 1]
 }
 
 advance :: proc(t: ^Tokenizer) -> u8 {
 	t.current += 1
-	return t.buf[t.current - 1]
+	return t.source[t.current - 1]
 }
 
 is_at_end :: proc(t: ^Tokenizer) -> bool {
-	return t.current >= len(t.buf)
+	return t.current >= len(t.source)
 }
 
 skip_whitespace :: proc(t: ^Tokenizer) {
@@ -140,17 +131,25 @@ skip_whitespace :: proc(t: ^Tokenizer) {
 }
 
 identifier_type :: proc(t: ^Tokenizer) -> TokenKind {
-	str := t.buf[t.start:t.current]
+	str := t.source[t.start:t.current]
 
 	keywords := [?]string{"return", "for", "while", "if", "else", "struct", "I32", "true", "false"}
 
 	for _, i in keywords {
 		if keywords[i] == transmute(string)str {
-			return cast(TokenKind)(cast(int)TokenKind.RETURN + i)
+			return cast(TokenKind)(cast(int)TokenKind.Return + i)
 		}
 	}
 
-	return TokenKind.IDENTIFIER
+	return TokenKind.Identifier
+}
+
+is_alpha :: proc(r: u8) -> bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '_'
+}
+
+is_digit :: proc(r: u8) -> bool {
+	return r >= '0' && r <= '9'
 }
 
 identifier :: proc(t: ^Tokenizer) -> Token {
@@ -174,7 +173,7 @@ integer :: proc(t: ^Tokenizer) -> Token {
 		}
 	}
 
-	return make_token(t, TokenKind.INTEGER)
+	return make_token(t, TokenKind.Integer)
 }
 
 next_token :: proc(t: ^Tokenizer) -> Token {
@@ -183,7 +182,7 @@ next_token :: proc(t: ^Tokenizer) -> Token {
 	t.start = t.current
 
 	if is_at_end(t) {
-		return make_token(t, TokenKind.EOF)
+		return make_token(t, TokenKind.Eof)
 	}
 
 	r := advance(t)
@@ -199,94 +198,94 @@ next_token :: proc(t: ^Tokenizer) -> Token {
 	case '!':
 		if peek(t) == '=' {
 			advance(t)
-			return make_token(t, TokenKind.NOT_EQUAL)
+			return make_token(t, TokenKind.NotEqual)
 		}
-		return make_token(t, TokenKind.NOT)
+		return make_token(t, TokenKind.Not)
 	case '#':
-		return make_token(t, TokenKind.HASH)
+		return make_token(t, TokenKind.Hash)
 	case '$':
-		return make_token(t, TokenKind.DOLLAR)
+		return make_token(t, TokenKind.Dollar)
 	case '%':
-		return make_token(t, TokenKind.PERCENT)
+		return make_token(t, TokenKind.Percent)
 	case '&':
 		if peek(t) == '&' {
 			advance(t)
-			return make_token(t, TokenKind.AND)
+			return make_token(t, TokenKind.And)
 		}
-		return make_token(t, TokenKind.AMPERSAND)
+		return make_token(t, TokenKind.Ampersand)
 	case '(':
-		return make_token(t, TokenKind.LPAREN)
+		return make_token(t, TokenKind.LParen)
 	case ')':
-		return make_token(t, TokenKind.RPAREN)
+		return make_token(t, TokenKind.RParen)
 	case '*':
-		return make_token(t, TokenKind.ASTERISK)
+		return make_token(t, TokenKind.Asterisk)
 	case '+':
-		return make_token(t, TokenKind.PLUS)
+		return make_token(t, TokenKind.Plus)
 	case ',':
-		return make_token(t, TokenKind.PLUS)
+		return make_token(t, TokenKind.Comma)
 	case '-':
-		return make_token(t, TokenKind.MINUS)
+		return make_token(t, TokenKind.Minus)
 	case '.':
-		return make_token(t, TokenKind.PERIOD)
+		return make_token(t, TokenKind.Period)
 	case '/':
-		return make_token(t, TokenKind.SLASH)
+		return make_token(t, TokenKind.Slash)
 	case ':':
 		if peek(t) == '=' {
 			advance(t)
-			return make_token(t, TokenKind.INIT)
+			return make_token(t, TokenKind.Init)
 		}
-		return make_token(t, TokenKind.COLON)
+		return make_token(t, TokenKind.Colon)
 	case ';':
-		return make_token(t, TokenKind.SEMICOLON)
+		return make_token(t, TokenKind.Semicolon)
 	case '=':
 		if peek(t) == '=' {
 			advance(t)
-			return make_token(t, TokenKind.EQUAL)
+			return make_token(t, TokenKind.Equal)
 		}
-		return make_token(t, TokenKind.ASSIGN)
+		return make_token(t, TokenKind.Assign)
 	case '<':
 		if peek(t) == '<' {
 			advance(t)
-			return make_token(t, TokenKind.LSHIFT)
+			return make_token(t, TokenKind.LShift)
 		}
 		if peek(t) == '=' {
 			advance(t)
-			return make_token(t, TokenKind.LESS_EQUAL)
+			return make_token(t, TokenKind.LessEqual)
 		}
-		return make_token(t, TokenKind.LESS)
+		return make_token(t, TokenKind.Less)
 	case '>':
 		if peek(t) == '>' {
 			advance(t)
-			return make_token(t, TokenKind.RSHIFT)
+			return make_token(t, TokenKind.RShift)
 		}
 		if peek(t) == '=' {
 			advance(t)
-			return make_token(t, TokenKind.GREATER_EQUAL)
+			return make_token(t, TokenKind.GreaterEqual)
 		}
-		return make_token(t, TokenKind.GREATER)
+		return make_token(t, TokenKind.Greater)
 	case '[':
-		return make_token(t, TokenKind.LBRACKET)
+		return make_token(t, TokenKind.LBracket)
 	case ']':
-		return make_token(t, TokenKind.RBRACKET)
+		return make_token(t, TokenKind.RBracket)
 	case '^':
-		return make_token(t, TokenKind.HAT)
+		return make_token(t, TokenKind.Hat)
 	case '{':
-		return make_token(t, TokenKind.LBRACE)
+		return make_token(t, TokenKind.LBrace)
 	case '}':
-		return make_token(t, TokenKind.RBRACE)
+		return make_token(t, TokenKind.RBrace)
 	case '~':
-		return make_token(t, TokenKind.TILDE)
+		return make_token(t, TokenKind.Tilde)
 	case '|':
-		return make_token(t, TokenKind.PIPE)
+		return make_token(t, TokenKind.Pipe)
 	}
 
-	return make_token(t, TokenKind.ERROR)
+	return make_token(t, TokenKind.Error)
 }
 
 tokenize :: proc(t: ^Tokenizer) -> [dynamic]Token {
 	list: [dynamic]Token
 
-	for tok := next_token(t); tok.kind != TokenKind.EOF; tok = next_token(t) {
+	for tok := next_token(t); tok.kind != TokenKind.Eof; tok = next_token(t) {
 		append(&list, tok)
 	}
 
