@@ -317,9 +317,6 @@ print_ast :: proc(p: ^Parser, indent: int = 0) {
 			fmt.printf("IntExpr\n")
 		case .VarExpr:
 			fmt.printf("VarExpr\n")
-		case .ParenExpr:
-			fmt.printf("ParenExpr\n")
-			print_node(p, node.data.lhs, indent + 2)
 		case .AddExpr:
 			fmt.printf("AddExpr\n")
 			print_node(p, node.data.lhs, indent + 2)
