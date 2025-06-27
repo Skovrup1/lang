@@ -1,5 +1,6 @@
 package main
 
+import "hir"
 import "lexer"
 import "parser"
 
@@ -11,6 +12,8 @@ main :: proc() {
 	Options :: struct {
 		E: bool,
 	}
+
+	fmt.println(size_of(parser.Node))
 
 	opts: Options
 	err := flags.parse(&opts, os.args[1:], .Unix)
@@ -45,7 +48,7 @@ main :: proc() {
 	}
 	fmt.println()
 
-	p := parser.make_parser(source, token_list)
+	p := parser.make_parser(source, token_list[:])
 	nodes := parser.parse(&p)
 
 	for node in nodes {
@@ -53,4 +56,13 @@ main :: proc() {
 	}
 
 	parser.print_ast(&p)
+
+	g := hir.make_generator(source, token_list[:], nodes[:], p.extra_data[:])
+
+	hir.generate(&g)
+
+	for inst in g.instructions {
+		fmt.println(inst)
+	}
+	fmt.println()
 }

@@ -1,25 +1,25 @@
 package parser
 
 import "core:fmt"
-import "core:strconv"
 
 import "../lexer"
 
 TokenKind_Set :: bit_set[lexer.TokenKind]
 
-NodeIndex :: distinct i32
-INVALID_NODE: NodeIndex : -1
+NodeIndex :: distinct u32
+INVALID_NODE_INDEX :: max(NodeIndex)
 
-NodeKind :: enum i32 {
-	ProgDef,
-	FuncDef,
+NodeKind :: enum u8 {
+	Root,
+	FuncDecl,
+	VarDecl,
 	BlockStmt,
 	ReturnStmt,
-	VarStmt,
 	IfStmt,
+	//WhileStmt,
+	//ForStmt,
 	AssignStmt,
-	IntExpr,
-	VarExpr,
+	//CallExpr,
 	MulExpr,
 	//DivExpr,
 	//ModExpr,
@@ -40,7 +40,9 @@ NodeKind :: enum i32 {
 	//OrExpr,
 	NegateExpr,
 	//NotExpr,
-	//bitNotExpr,
+	//BitNotExpr,
+	IntLit,
+	IdentLit,
 }
 
 Node :: struct {
@@ -56,12 +58,12 @@ Parser :: struct {
 	current:    lexer.TokenIndex,
 	previous:   lexer.TokenIndex,
 	source:     []u8,
-	tokens:     [dynamic]lexer.Token,
+	tokens:     []lexer.Token,
 	nodes:      [dynamic]Node,
 	extra_data: [dynamic]NodeIndex,
 }
 
-make_parser :: proc(source: []u8, tokens: [dynamic]lexer.Token) -> Parser {
+make_parser :: proc(source: []u8, tokens: []lexer.Token) -> Parser {
 	return Parser{0, 0, source, tokens, make([dynamic]Node), make([dynamic]NodeIndex)}
 }
 
@@ -98,7 +100,7 @@ option :: proc(p: ^Parser, expected: lexer.TokenKind) {
 parse :: proc(p: ^Parser) -> [dynamic]Node {
 	token := p.current
 	func := parse_function(p)
-	append(&p.nodes, Node{.ProgDef, token, {func, INVALID_NODE}})
+	append(&p.nodes, Node{.Root, token, {func, INVALID_NODE_INDEX}})
 
 	return p.nodes
 }
@@ -114,9 +116,9 @@ parse_function :: proc(p: ^Parser) -> NodeIndex {
 	expect(p, .Greater)
 	expect(p, .I32)
 
-	proto := INVALID_NODE
+	proto := INVALID_NODE_INDEX
 	stmt := parse_statement(p)
-	append(&p.nodes, Node{.FuncDef, ident, {proto, stmt}})
+	append(&p.nodes, Node{.FuncDecl, ident, {proto, stmt}})
 
 	return NodeIndex(len(p.nodes) - 1)
 }
@@ -153,18 +155,18 @@ parse_statement :: proc(p: ^Parser) -> NodeIndex {
 		token := p.current
 		advance(p)
 		expr := parse_expression(p)
-		append(&p.nodes, Node{.ReturnStmt, token, {expr, INVALID_NODE}})
+		append(&p.nodes, Node{.ReturnStmt, token, {expr, INVALID_NODE_INDEX}})
 	case .Identifier:
 		token := p.current
 		advance(p)
 		if peek(p) == .Init {
 			advance(p)
 			expr := parse_expression(p)
-			append(&p.nodes, Node{.VarStmt, token, {expr, INVALID_NODE}})
+			append(&p.nodes, Node{.VarDecl, token, {expr, INVALID_NODE_INDEX}})
 		} else if peek(p) == .Assign {
 			advance(p)
 			expr := parse_expression(p)
-			append(&p.nodes, Node{.AssignStmt, token, {expr, INVALID_NODE}})
+			append(&p.nodes, Node{.AssignStmt, token, {expr, INVALID_NODE_INDEX}})
 		} else {
 			panic("oops")
 		}
@@ -257,10 +259,10 @@ parse_primary :: proc(p: ^Parser) -> NodeIndex {
 	#partial switch peek(p) {
 	case .Identifier:
 		advance(p)
-		append(&p.nodes, Node{.VarExpr, p.previous, {}})
+		append(&p.nodes, Node{.IdentLit, p.previous, {}})
 	case .Integer:
 		advance(p)
-		append(&p.nodes, Node{.IntExpr, p.previous, {}})
+		append(&p.nodes, Node{.IntLit, p.previous, {}})
 	case .LParen:
 		advance(p)
 		token := p.previous
@@ -270,7 +272,7 @@ parse_primary :: proc(p: ^Parser) -> NodeIndex {
 		advance(p)
 		token := p.previous
 		expr := parse_expression(p)
-		append(&p.nodes, Node{.NegateExpr, token, {expr, INVALID_NODE}})
+		append(&p.nodes, Node{.NegateExpr, token, {expr, INVALID_NODE_INDEX}})
 	}
 
 	return NodeIndex(len(p.nodes) - 1)
@@ -288,11 +290,11 @@ print_ast :: proc(p: ^Parser, indent: int = 0) {
 
 		node := p.nodes[index]
 		switch node.kind {
-		case .ProgDef:
-			fmt.printf("ProgDef\n")
+		case .Root:
+			fmt.printf("Root\n")
 			print_node(p, node.data.lhs, indent + 2)
-		case .FuncDef:
-			fmt.printf("FuncDef\n")
+		case .FuncDecl:
+			fmt.printf("FuncDecl\n")
 			print_node(p, node.data.rhs, indent + 2)
 		case .BlockStmt:
 			fmt.printf("BlockStmt\n")
@@ -307,16 +309,16 @@ print_ast :: proc(p: ^Parser, indent: int = 0) {
 			print_node(p, node.data.lhs, indent + 2)
 		case .IfStmt:
 			fmt.printf("IfStmt\n")
-		case .VarStmt:
-			fmt.printf("VarStmt\n")
+		case .VarDecl:
+			fmt.printf("VarDecl\n")
 			print_node(p, node.data.lhs, indent + 2)
 		case .AssignStmt:
 			fmt.printf("AssignStmt\n")
 			print_node(p, node.data.lhs, indent + 2)
-		case .IntExpr:
-			fmt.printf("IntExpr\n")
-		case .VarExpr:
-			fmt.printf("VarExpr\n")
+		case .IntLit:
+			fmt.printf("IntLit\n")
+		case .IdentLit:
+			fmt.printf("IdentLit\n")
 		case .AddExpr:
 			fmt.printf("AddExpr\n")
 			print_node(p, node.data.lhs, indent + 2)

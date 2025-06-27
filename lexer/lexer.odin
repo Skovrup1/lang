@@ -2,7 +2,8 @@ package lexer
 
 import "core:fmt"
 
-TokenIndex :: distinct i32
+TokenIndex :: distinct u32
+INVALID_TOKEN_INDEX :: max(TokenIndex)
 
 Tokenizer :: struct {
 	start:   int,
@@ -11,7 +12,7 @@ Tokenizer :: struct {
 	source:  []u8,
 }
 
-TokenKind :: enum i32 {
+TokenKind :: enum u8 {
 	Null = 0,
 	Eof,
 	Error,
@@ -72,6 +73,7 @@ TokenKind :: enum i32 {
 Token :: struct {
 	kind:  TokenKind,
 	start: TokenIndex,
+	end:   TokenIndex,
 }
 
 make_tokenizer :: proc(buf: []u8, start := 0, current := 0, line := 1) -> Tokenizer {
@@ -79,7 +81,7 @@ make_tokenizer :: proc(buf: []u8, start := 0, current := 0, line := 1) -> Tokeni
 }
 
 make_token :: proc(t: ^Tokenizer, kind: TokenKind) -> Token {
-	return Token{kind, TokenIndex(t.start)}
+	return Token{kind, TokenIndex(t.start), TokenIndex(t.current)}
 }
 
 peek :: proc(t: ^Tokenizer) -> u8 {
