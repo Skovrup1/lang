@@ -61,11 +61,9 @@ generate_node :: proc(g: ^Generator, node: parser.Node) -> InstIndex {
 		return rhs
 	case .VarDecl:
 	case .BlockStmt:
-		first := node.data.lhs
-		last := node.data.rhs
-		stmts := g.extra_data[first:last]
-		for node_i in stmts {
-			stmt_node := g.nodes[node_i]
+		stmts := get_block_slice(g, node)
+		for stmt_index in stmts {
+			stmt_node := g.nodes[stmt_index]
 			generate_node(g, stmt_node)
 		}
 	case .ReturnStmt:
@@ -75,12 +73,10 @@ generate_node :: proc(g: ^Generator, node: parser.Node) -> InstIndex {
 	case .IfStmt:
 	case .AssignStmt:
 	case .MulExpr:
-		lhs := generate_node(g, g.nodes[node.data.lhs])
-		rhs := generate_node(g, g.nodes[node.data.rhs])
+		lhs, rhs := get_bin(g, node)
 		append(&g.instructions, Inst{.Mul, {lhs, rhs}})
 	case .AddExpr:
-		lhs := generate_node(g, g.nodes[node.data.lhs])
-		rhs := generate_node(g, g.nodes[node.data.rhs])
+		lhs, rhs := get_bin(g, node)
 		append(&g.instructions, Inst{.Add, {lhs, rhs}})
 	case .NegateExpr:
 	case .IntLit:
@@ -92,4 +88,16 @@ generate_node :: proc(g: ^Generator, node: parser.Node) -> InstIndex {
 	}
 
 	return InstIndex(len(g.instructions) - 1)
+}
+
+get_bin :: proc(g: ^Generator, node: parser.Node) -> (InstIndex, InstIndex) {
+	lhs := generate_node(g, g.nodes[node.data.lhs])
+	rhs := generate_node(g, g.nodes[node.data.rhs])
+	return lhs, rhs
+}
+
+get_block_slice :: proc(g: ^Generator, node: parser.Node) -> []parser.NodeIndex {
+	first := node.data.lhs
+	last := node.data.lhs
+	return g.extra_data[first:last]
 }
