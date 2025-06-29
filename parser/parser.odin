@@ -16,6 +16,7 @@ NodeKind :: enum u8 {
 	BlockStmt,
 	ReturnStmt,
 	IfStmt,
+	IfSimpleStmt, // no else
 	//WhileStmt,
 	//ForStmt,
 	AssignStmt,
@@ -31,7 +32,7 @@ NodeKind :: enum u8 {
 	//LessEqualExpr,
 	//GreaterExpr,
 	//GreaterEqualExpr,
-	//EqualExpr,
+	EqualExpr,
 	//NotEqualExpr,
 	//BitAndExpr,
 	//BitXorExpr,
@@ -129,26 +130,30 @@ parse_statement :: proc(p: ^Parser) -> NodeIndex {
 		token := p.current
 		advance(p) // {
 		// note: currently this does not allow empty blocks
-		first := NodeIndex(len(p.extra_data))
+		stmts := make([dynamic]NodeIndex, 0, 1, context.temp_allocator)
 		for peek(p) != .RBrace {
-			append(&p.extra_data, parse_statement(p))
+			append(&stmts, parse_statement(p))
 		}
-		last := NodeIndex(len(p.extra_data) - 1)
+		first := NodeIndex(len(p.extra_data))
+		append(&p.extra_data, ..stmts[:])
+		last := NodeIndex(len(p.extra_data))
 		advance(p) // }
 		append(&p.nodes, Node{.BlockStmt, token, {first, last}})
 	case .If:
-		panic("todo")
-	/*
+		token := p.current
 		advance(p) // .If
-		condition := parse_expression()
-		if_body := parse_statement()
-		else_body: NodeIndex
+		condition := parse_expression(p)
+		then_body := parse_statement(p)
 		if peek(p) == .Else {
-			advance(p)
-			else_body = parse_statement()
+			advance(p) // .Else
+			else_body := parse_statement(p)
+			extra_index := NodeIndex(len(p.extra_data))
+			append(&p.extra_data, then_body)
+			append(&p.extra_data, else_body)
+			append(&p.nodes, Node{.IfStmt, token, {condition, extra_index}})
+		} else {
+			append(&p.nodes, Node{.IfSimpleStmt, token, {condition, then_body}})
 		}
-        append(&p.nodes, Node{.IfStmt, p.current, {cond, body, else_body}}
-        */
 	case .While:
 		panic("todo")
 	case .Return:
@@ -156,6 +161,7 @@ parse_statement :: proc(p: ^Parser) -> NodeIndex {
 		advance(p)
 		expr := parse_expression(p)
 		append(&p.nodes, Node{.ReturnStmt, token, {expr, INVALID_NODE_INDEX}})
+		expect(p, .Semicolon)
 	case .Identifier:
 		token := p.current
 		advance(p)
@@ -163,17 +169,15 @@ parse_statement :: proc(p: ^Parser) -> NodeIndex {
 			advance(p)
 			expr := parse_expression(p)
 			append(&p.nodes, Node{.VarDecl, token, {expr, INVALID_NODE_INDEX}})
+			expect(p, .Semicolon)
 		} else if peek(p) == .Assign {
 			advance(p)
 			expr := parse_expression(p)
 			append(&p.nodes, Node{.AssignStmt, token, {expr, INVALID_NODE_INDEX}})
+			expect(p, .Semicolon)
 		} else {
 			panic("oops")
 		}
-	case:
-		// expression stmt
-		expr := parse_expression(p)
-		expect(p, .Semicolon)
 	}
 
 	return NodeIndex(len(p.nodes) - 1)
@@ -184,18 +188,56 @@ parse_expression :: proc(p: ^Parser) -> NodeIndex {
 }
 
 parse_logical_or :: proc(p: ^Parser) -> NodeIndex {
+	#partial switch (peek(p)) {
+	case .Or:
+		panic("todo")
+	}
+
 	return parse_logical_and(p)
 }
 
 parse_logical_and :: proc(p: ^Parser) -> NodeIndex {
+	#partial switch (peek(p)) {
+	case .And:
+		panic("todo")
+	}
+
 	return parse_equality(p)
 }
 
 parse_equality :: proc(p: ^Parser) -> NodeIndex {
-	return parse_comparison(p)
+	left := parse_comparison(p)
+
+	for peek(p) == .Equal || peek(p) == .NotEqual {
+		op := peek(p)
+		token := p.current
+		advance(p)
+
+		right := parse_comparison(p)
+		#partial switch op {
+		case .Equal:
+			append(&p.nodes, Node{.EqualExpr, token, {left, right}})
+		case .NotEqual:
+			panic("todo")
+		}
+
+		left = NodeIndex(len(&p.nodes) - 1)
+	}
+
+	return left
 }
 
 parse_comparison :: proc(p: ^Parser) -> NodeIndex {
+	#partial switch (peek(p)) {
+	case .Less:
+		panic("todo")
+	case .LessEqual:
+		panic("todo")
+	case .Greater:
+		panic("todo")
+	case .GreaterEqual:
+		panic("todo")
+	}
 	return parse_term(p)
 }
 
@@ -300,15 +342,28 @@ print_ast :: proc(p: ^Parser, indent: int = 0) {
 			fmt.printf("BlockStmt\n")
 			first := node.data.lhs
 			last := node.data.rhs
-			for i in first ..< last {
+			for i in first ..= last - 1 {
 				stmt_index := p.extra_data[i]
 				print_node(p, stmt_index, indent + 2)
 			}
 		case .ReturnStmt:
 			fmt.printf("ReturnStmt\n")
 			print_node(p, node.data.lhs, indent + 2)
+		case .IfSimpleStmt:
+			fmt.printf("IfStmt\n")
+			cond_node := node.data.lhs
+			then_node := node.data.rhs
+			print_node(p, cond_node, indent + 2)
+			print_node(p, then_node, indent + 2)
 		case .IfStmt:
 			fmt.printf("IfStmt\n")
+			cond_node := node.data.lhs
+			extra_node := node.data.rhs
+			then_node := p.extra_data[extra_node]
+			else_node := p.extra_data[extra_node + 1]
+			print_node(p, cond_node, indent + 2)
+			print_node(p, then_node, indent + 2)
+			print_node(p, else_node, indent + 2)
 		case .VarDecl:
 			fmt.printf("VarDecl\n")
 			print_node(p, node.data.lhs, indent + 2)
@@ -319,6 +374,10 @@ print_ast :: proc(p: ^Parser, indent: int = 0) {
 			fmt.printf("IntLit\n")
 		case .IdentLit:
 			fmt.printf("IdentLit\n")
+		case .EqualExpr:
+			fmt.printf("EqualExpr\n")
+			print_node(p, node.data.lhs, indent + 2)
+			print_node(p, node.data.rhs, indent + 2)
 		case .AddExpr:
 			fmt.printf("AddExpr\n")
 			print_node(p, node.data.lhs, indent + 2)

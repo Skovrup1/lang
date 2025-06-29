@@ -13,7 +13,7 @@ main :: proc() {
 		E: bool,
 	}
 
-	fmt.println(size_of(parser.Node))
+	//fmt.println(size_of(parser.Node))
 
 	opts: Options
 	err := flags.parse(&opts, os.args[1:], .Unix)
@@ -22,7 +22,7 @@ main :: proc() {
 		os.exit(1)
 	}
 
-	handle, open_err := os.open("tests/binary_expr.lang")
+	handle, open_err := os.open("tests/nested.lang")
 	defer os.close(handle)
 
 	if open_err != os.ERROR_NONE {
@@ -43,26 +43,28 @@ main :: proc() {
 	t := lexer.make_tokenizer(source)
 	token_list := lexer.tokenize(&t)
 
-	for token in token_list {
+	/*for token in token_list {
 		fmt.println(token.kind)
 	}
-	fmt.println()
+	fmt.println()*/
 
 	p := parser.make_parser(source, token_list[:])
 	nodes := parser.parse(&p)
 
-	for node in nodes {
+	/*for node in nodes {
 		fmt.println(node)
 	}
+    fmt.println()*/
 
 	parser.print_ast(&p)
 
 	g := hir.make_generator(source, token_list[:], nodes[:], p.extra_data[:])
 
 	hir.generate(&g)
+	hir.print(&g)
 
-	for inst in g.instructions {
+	/*for inst in g.instructions {
 		fmt.println(inst)
 	}
-	fmt.println()
+	fmt.println()*/
 }
