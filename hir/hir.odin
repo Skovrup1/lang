@@ -132,6 +132,47 @@ generate_node :: proc(g: ^Generator, node: parser.Node) -> InstIndex {
 			generate_node(g, stmt_node)
 		}
 		leave_scope(g)
+	case .ExprStmt:
+		get_lhs(g, node)
+	case .ForStmt:
+		enter_scope(g)
+
+		extra_data_index := node.data.rhs
+		init_node := g.nodes[g.extra_data[extra_data_index]]
+		cond_node := g.nodes[g.extra_data[extra_data_index+1]]
+		incr_node := g.nodes[g.extra_data[extra_data_index+2]]
+		body_node := g.nodes[node.data.lhs]
+
+		generate_node(g, init_node)
+
+		cond_label := InstIndex(len(g.instructions))
+		append(&g.instructions, Inst{.Label, u32(INVALID_EXTRA_INDEX)})
+		g.label_names[cond_label] = new_label(g)
+		cond_val := generate_node(g, cond_node)
+
+		branch := InstIndex(len(g.instructions))
+		append(&g.instructions, Inst{.Branch, u32(INVALID_EXTRA_INDEX)})
+
+		body_label := InstIndex(len(g.instructions))
+		append(&g.instructions, Inst{.Label, u32(INVALID_EXTRA_INDEX)})
+		g.label_names[body_label] = new_label(g)
+		generate_node(g, body_node)
+		generate_node(g, incr_node)
+
+		append(&g.instructions, Inst{.Jump, u32(cond_label)})
+
+		exit_label := InstIndex(len(g.instructions))
+		append(&g.instructions, Inst{.Label, u32(INVALID_EXTRA_INDEX)})
+		g.label_names[exit_label] = new_label(g)
+
+		g.instructions[branch].data = u32(len(g.extra))
+		append(&g.extra, u32(cond_val))
+		append(&g.extra, u32(body_label))
+		append(&g.extra, u32(exit_label))
+
+		leave_scope(g)
+	case .WhileStmt:
+		panic("todo")
 	case .ReturnStmt:
 		expr := get_lhs(g, node)
 		append(&g.instructions, Inst{.Return, u32(expr)})
@@ -198,15 +239,19 @@ generate_node :: proc(g: ^Generator, node: parser.Node) -> InstIndex {
 		append(&g.extra, u32(condition))
 		append(&g.extra, u32(then_label))
 		append(&g.extra, u32(else_label))
-	case .AssignStmt:
-		expr := get_lhs(g, node)
-		token := g.tokens[node.main_token]
-		ident := cast(string)g.source[token.start:token.end]
-		alloc, _ := find_symbol(g, ident)
-
-		append(&g.instructions, Inst{.Store, u32(len(g.extra))})
-		append(&g.extra, u32(alloc))
-		append(&g.extra, u32(expr))
+	case .AssignExpr:
+		val := get_rhs(g, node)
+		lhs := g.nodes[node.data.lhs]
+		if lhs.kind == .IdentLit {
+			token := g.tokens[lhs.main_token]
+			ident := cast(string)g.source[token.start:token.end]
+			alloc, _ := find_symbol(g, ident)
+			append(&g.instructions, Inst{.Store, u32(len(g.extra))})
+			append(&g.extra, u32(alloc))
+			append(&g.extra, u32(val))
+		} else {
+			panic("cannot assign to non-identifier")
+		}
 	case .EqualExpr:
 		lhs, rhs := get_bin(g, node)
 		extra_index := u32(len(g.extra))

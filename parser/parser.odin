@@ -17,9 +17,10 @@ NodeKind :: enum u8 {
 	ReturnStmt,
 	IfStmt,
 	IfSimpleStmt, // no else
-	//WhileStmt,
-	//ForStmt,
-	AssignStmt,
+	WhileStmt,
+	ForStmt,
+	AssignExpr,
+	ExprStmt,
 	//CallExpr,
 	MulExpr,
 	//DivExpr,
@@ -129,7 +130,6 @@ parse_statement :: proc(p: ^Parser) -> NodeIndex {
 	case .LBrace:
 		token := p.current
 		advance(p) // {
-		// note: currently this does not allow empty blocks
 		stmts := make([dynamic]NodeIndex, 0, 1, context.temp_allocator)
 		for peek(p) != .RBrace {
 			append(&stmts, parse_statement(p))
@@ -156,27 +156,40 @@ parse_statement :: proc(p: ^Parser) -> NodeIndex {
 		}
 	case .While:
 		panic("todo")
+	case .For:
+		token := p.current
+		advance(p) // .For
+		init := parse_statement(p)
+		cond := parse_expression(p)
+		expect(p, .Semicolon)
+		incr := parse_expression(p)
+		body := parse_statement(p)
+
+		extra_index := NodeIndex(len(p.extra_data))
+		append(&p.extra_data, init)
+		append(&p.extra_data, cond)
+		append(&p.extra_data, incr)
+		append(&p.nodes, Node{.ForStmt, token, {body, extra_index}})
 	case .Return:
 		token := p.current
-		advance(p)
+		advance(p) // .Return
 		expr := parse_expression(p)
 		append(&p.nodes, Node{.ReturnStmt, token, {expr, INVALID_NODE_INDEX}})
 		expect(p, .Semicolon)
 	case .Identifier:
 		token := p.current
-		advance(p)
+		advance(p) // .Identifier
 		if peek(p) == .Init {
-			advance(p)
+			advance(p) // Init
 			expr := parse_expression(p)
 			append(&p.nodes, Node{.VarDecl, token, {expr, INVALID_NODE_INDEX}})
 			expect(p, .Semicolon)
-		} else if peek(p) == .Assign {
-			advance(p)
-			expr := parse_expression(p)
-			append(&p.nodes, Node{.AssignStmt, token, {expr, INVALID_NODE_INDEX}})
-			expect(p, .Semicolon)
 		} else {
-			panic("oops")
+			// expression statement
+			p.current = token // backtrack
+			expr := parse_expression(p)
+			append(&p.nodes, Node{.ExprStmt, token, {expr, INVALID_NODE_INDEX}})
+			expect(p, .Semicolon)
 		}
 	}
 
@@ -184,7 +197,21 @@ parse_statement :: proc(p: ^Parser) -> NodeIndex {
 }
 
 parse_expression :: proc(p: ^Parser) -> NodeIndex {
-	return parse_logical_or(p)
+	return parse_assignment(p)
+}
+
+parse_assignment :: proc(p: ^Parser) -> NodeIndex {
+	expr := parse_logical_or(p)
+
+	if peek(p) == .Assign {
+		token := p.current
+		advance(p)
+		value := parse_assignment(p)
+		append(&p.nodes, Node{.AssignExpr, token, {expr, value}})
+		return NodeIndex(len(p.nodes) - 1)
+	}
+
+	return expr
 }
 
 parse_logical_or :: proc(p: ^Parser) -> NodeIndex {
@@ -346,6 +373,10 @@ print_ast :: proc(p: ^Parser, indent: int = 0) {
 				stmt_index := p.extra_data[i]
 				print_node(p, stmt_index, indent + 2)
 			}
+		case .ForStmt:
+			fmt.printf("ForStmt\n")
+		case .WhileStmt:
+			fmt.printf("WhileStmt\n")
 		case .ReturnStmt:
 			fmt.printf("ReturnStmt\n")
 			print_node(p, node.data.lhs, indent + 2)
@@ -365,15 +396,19 @@ print_ast :: proc(p: ^Parser, indent: int = 0) {
 			print_node(p, then_node, indent + 2)
 			print_node(p, else_node, indent + 2)
 		case .VarDecl:
-			fmt.printf("VarDecl\n")
-			print_node(p, node.data.lhs, indent + 2)
-		case .AssignStmt:
-			fmt.printf("AssignStmt\n")
-			print_node(p, node.data.lhs, indent + 2)
-		case .IntLit:
-			fmt.printf("IntLit\n")
-		case .IdentLit:
-			fmt.printf("IdentLit\n")
+            fmt.printf("VarDecl\n")
+            print_node(p, node.data.lhs, indent + 2)
+        case .AssignExpr:
+            fmt.printf("AssignExpr\n")
+            print_node(p, node.data.lhs, indent + 2)
+            print_node(p, node.data.rhs, indent + 2)
+        case .ExprStmt:
+            fmt.printf("ExprStmt\n")
+            print_node(p, node.data.lhs, indent + 2)
+        case .IntLit:
+            fmt.printf("IntLit\n")
+        case .IdentLit:
+            fmt.printf("IdentLit\n")
 		case .EqualExpr:
 			fmt.printf("EqualExpr\n")
 			print_node(p, node.data.lhs, indent + 2)
