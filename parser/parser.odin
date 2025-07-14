@@ -396,19 +396,19 @@ print_ast :: proc(p: ^Parser, indent: int = 0) {
 			print_node(p, then_node, indent + 2)
 			print_node(p, else_node, indent + 2)
 		case .VarDecl:
-            fmt.printf("VarDecl\n")
-            print_node(p, node.data.lhs, indent + 2)
-        case .AssignExpr:
-            fmt.printf("AssignExpr\n")
-            print_node(p, node.data.lhs, indent + 2)
-            print_node(p, node.data.rhs, indent + 2)
-        case .ExprStmt:
-            fmt.printf("ExprStmt\n")
-            print_node(p, node.data.lhs, indent + 2)
-        case .IntLit:
-            fmt.printf("IntLit\n")
-        case .IdentLit:
-            fmt.printf("IdentLit\n")
+			fmt.printf("VarDecl\n")
+			print_node(p, node.data.lhs, indent + 2)
+		case .AssignExpr:
+			fmt.printf("AssignExpr\n")
+			print_node(p, node.data.lhs, indent + 2)
+			print_node(p, node.data.rhs, indent + 2)
+		case .ExprStmt:
+			fmt.printf("ExprStmt\n")
+			print_node(p, node.data.lhs, indent + 2)
+		case .IntLit:
+			fmt.printf("IntLit\n")
+		case .IdentLit:
+			fmt.printf("IdentLit\n")
 		case .EqualExpr:
 			fmt.printf("EqualExpr\n")
 			print_node(p, node.data.lhs, indent + 2)

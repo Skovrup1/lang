@@ -13,8 +13,6 @@ main :: proc() {
 		E: bool,
 	}
 
-	//fmt.println(size_of(parser.Node))
-
 	opts: Options
 	err := flags.parse(&opts, os.args[1:], .Unix)
 	if err != nil {
@@ -22,7 +20,7 @@ main :: proc() {
 		os.exit(1)
 	}
 
-	handle, open_err := os.open("tests/for.lang")
+	handle, open_err := os.open("tests/if.lang")
 	defer os.close(handle)
 
 	if open_err != os.ERROR_NONE {
@@ -43,18 +41,22 @@ main :: proc() {
 	t := lexer.make_tokenizer(source)
 	token_list := lexer.tokenize(&t)
 
+	///*
 	for token in token_list {
 		fmt.println(token.kind)
 	}
 	fmt.println()
+	///*
 
 	p := parser.make_parser(source, token_list[:])
 	nodes := parser.parse(&p)
 
-	for node in nodes {
+	/*
+    for node in nodes {
 		fmt.println(node)
 	}
     fmt.println()
+    */
 
 	parser.print_ast(&p)
 
@@ -63,8 +65,14 @@ main :: proc() {
 	hir.generate(&g)
 	hir.print(&g)
 
-	/*for inst in g.instructions {
+    /*
+	for inst in g.instructions {
 		fmt.println(inst)
 	}
-	fmt.println()*/
+	fmt.println()
+    */
+
+	//fmt.println(size_of(lexer.Token))
+	//fmt.println(size_of(parser.Node))
+	//fmt.println(size_of(hir.Inst))
 }

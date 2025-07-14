@@ -139,8 +139,8 @@ generate_node :: proc(g: ^Generator, node: parser.Node) -> InstIndex {
 
 		extra_data_index := node.data.rhs
 		init_node := g.nodes[g.extra_data[extra_data_index]]
-		cond_node := g.nodes[g.extra_data[extra_data_index+1]]
-		incr_node := g.nodes[g.extra_data[extra_data_index+2]]
+		cond_node := g.nodes[g.extra_data[extra_data_index + 1]]
+		incr_node := g.nodes[g.extra_data[extra_data_index + 2]]
 		body_node := g.nodes[node.data.lhs]
 
 		generate_node(g, init_node)
@@ -189,14 +189,20 @@ generate_node :: proc(g: ^Generator, node: parser.Node) -> InstIndex {
 		g.label_names[then_label] = new_label(g)
 		generate_node(g, then_node)
 
-		end_jump := InstIndex(len(g.instructions))
-		append(&g.instructions, Inst{.Jump, u32(INVALID_EXTRA_INDEX)})
+		then_is_not_return := g.instructions[len(g.instructions)-1].kind != .Return
+		end_jump: InstIndex
+		if then_is_not_return {
+			end_jump = InstIndex(len(g.instructions))
+			append(&g.instructions, Inst{.Jump, u32(INVALID_EXTRA_INDEX)})
+		}
 
 		end_label := InstIndex(len(g.instructions))
 		append(&g.instructions, Inst{.Label, u32(INVALID_EXTRA_INDEX)})
 		g.label_names[end_label] = new_label(g)
 
-		g.instructions[end_jump].data = u32(end_label)
+		if then_is_not_return {
+			g.instructions[end_jump].data = u32(end_label)
+		}
 
 		g.instructions[branch].data = u32(len(g.extra))
 		append(&g.extra, u32(condition))
@@ -217,23 +223,38 @@ generate_node :: proc(g: ^Generator, node: parser.Node) -> InstIndex {
 		g.label_names[then_label] = new_label(g)
 		generate_node(g, then_node)
 
-		then_jump := InstIndex(len(g.instructions))
-		append(&g.instructions, Inst{.Jump, u32(INVALID_EXTRA_INDEX)})
+		then_is_not_return := g.instructions[len(g.instructions) - 1].kind != .Return
+		then_jump: InstIndex
+		if then_is_not_return {
+			then_jump = InstIndex(len(g.instructions))
+			append(&g.instructions, Inst{.Jump, u32(INVALID_EXTRA_INDEX)})
+		}
 
 		else_label := InstIndex(len(g.instructions))
 		append(&g.instructions, Inst{.Label, u32(INVALID_EXTRA_INDEX)})
 		g.label_names[else_label] = new_label(g)
 		generate_node(g, else_node)
 
-		else_jump := InstIndex(len(g.instructions))
-		append(&g.instructions, Inst{.Jump, u32(INVALID_EXTRA_INDEX)})
+		else_is_not_return := g.instructions[len(g.instructions) - 1].kind != .Return
+		else_jump: InstIndex
+		if else_is_not_return {
+			else_jump = InstIndex(len(g.instructions))
+			append(&g.instructions, Inst{.Jump, u32(INVALID_EXTRA_INDEX)})
+		}
 
-		merge_label := InstIndex(len(g.instructions))
-		append(&g.instructions, Inst{.Label, u32(INVALID_EXTRA_INDEX)})
-		g.label_names[merge_label] = new_label(g)
+		merge_label: InstIndex
+		if then_is_not_return || else_is_not_return {
+			merge_label = InstIndex(len(g.instructions))
+			append(&g.instructions, Inst{.Label, u32(INVALID_EXTRA_INDEX)})
+			g.label_names[merge_label] = new_label(g)
+		}
 
-		g.instructions[then_jump].data = u32(merge_label)
-		g.instructions[else_jump].data = u32(merge_label)
+		if then_is_not_return {
+			g.instructions[then_jump].data = u32(merge_label)
+		}
+		if else_is_not_return {
+			g.instructions[else_jump].data = u32(merge_label)
+		}
 
 		g.instructions[branch].data = u32(len(g.extra))
 		append(&g.extra, u32(condition))
