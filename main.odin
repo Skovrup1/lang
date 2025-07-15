@@ -20,7 +20,7 @@ main :: proc() {
 		os.exit(1)
 	}
 
-	handle, open_err := os.open("tests/if.lang")
+	handle, open_err := os.open("tests/call.lang")
 	defer os.close(handle)
 
 	if open_err != os.ERROR_NONE {

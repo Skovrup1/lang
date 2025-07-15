@@ -12,6 +12,8 @@ INVALID_NODE_INDEX :: max(NodeIndex)
 NodeKind :: enum u8 {
 	Root,
 	FuncDecl,
+	ParamList,
+	ParamDecl,
 	VarDecl,
 	BlockStmt,
 	ReturnStmt,
@@ -21,7 +23,7 @@ NodeKind :: enum u8 {
 	ForStmt,
 	AssignExpr,
 	ExprStmt,
-	//CallExpr,
+	CallExpr,
 	MulExpr,
 	//DivExpr,
 	//ModExpr,
@@ -75,10 +77,16 @@ advance :: proc(p: ^Parser) {
 }
 
 peek :: proc(p: ^Parser) -> lexer.TokenKind {
+	if cast(int)p.current >= len(p.tokens) {
+		return .Eof
+	}
 	return p.tokens[p.current].kind
 }
 
 peek_next :: proc(p: ^Parser) -> lexer.TokenKind {
+	if cast(int)p.current + 1 >= len(p.tokens) {
+		return .Eof
+	}
 	return p.tokens[p.current + 1].kind
 }
 
@@ -101,8 +109,17 @@ option :: proc(p: ^Parser, expected: lexer.TokenKind) {
 
 parse :: proc(p: ^Parser) -> [dynamic]Node {
 	token := p.current
-	func := parse_function(p)
-	append(&p.nodes, Node{.Root, token, {func, INVALID_NODE_INDEX}})
+
+	funcs := make([dynamic]NodeIndex, 0, 1, context.temp_allocator)
+	for peek(p) != .Eof {
+		append(&funcs, parse_function(p))
+	}
+
+	first := NodeIndex(len(p.extra_data))
+	append(&p.extra_data, ..funcs[:])
+	last := NodeIndex(len(p.extra_data))
+
+	append(&p.nodes, Node{.Root, token, {first, last}})
 
 	return p.nodes
 }
@@ -113,16 +130,44 @@ parse_function :: proc(p: ^Parser) -> NodeIndex {
 	expect(p, .Colon)
 	expect(p, .Colon)
 	expect(p, .LParen)
+	proto := parse_parameter_list(p)
 	expect(p, .RParen)
 	expect(p, .Minus)
 	expect(p, .Greater)
 	expect(p, .I32)
 
-	proto := INVALID_NODE_INDEX
 	stmt := parse_statement(p)
 	append(&p.nodes, Node{.FuncDecl, ident, {proto, stmt}})
 
 	return NodeIndex(len(p.nodes) - 1)
+}
+
+parse_parameter_list :: proc(p: ^Parser) -> NodeIndex {
+	token := p.current
+	params_start := NodeIndex(len(p.extra_data))
+	for peek(p) != .RParen {
+		param_ident := p.current
+		expect(p, .Identifier)
+		expect(p, .Colon)
+		expect(p, .I32) // for now only i32
+		append(&p.nodes, Node{.ParamDecl, param_ident, {INVALID_NODE_INDEX, INVALID_NODE_INDEX}})
+		append(&p.extra_data, NodeIndex(len(p.nodes) - 1))
+
+		if peek(p) == .Comma {
+			advance(p)
+		} else {
+			break // no comma
+		}
+	}
+	params_end := NodeIndex(len(p.extra_data))
+
+	// only create a paramlist node if there were parameters
+	if params_start != params_end {
+		append(&p.nodes, Node{.ParamList, token, {params_start, params_end}})
+		return NodeIndex(len(p.nodes) - 1)
+	}
+
+	return INVALID_NODE_INDEX
 }
 
 parse_statement :: proc(p: ^Parser) -> NodeIndex {
@@ -327,6 +372,9 @@ parse_factor :: proc(p: ^Parser) -> NodeIndex {
 parse_primary :: proc(p: ^Parser) -> NodeIndex {
 	#partial switch peek(p) {
 	case .Identifier:
+		if peek_next(p) == .LParen {
+			return parse_call_expression(p)
+		}
 		advance(p)
 		append(&p.nodes, Node{.IdentLit, p.previous, {}})
 	case .Integer:
@@ -347,6 +395,25 @@ parse_primary :: proc(p: ^Parser) -> NodeIndex {
 	return NodeIndex(len(p.nodes) - 1)
 }
 
+parse_call_expression :: proc(p: ^Parser) -> NodeIndex {
+	token := p.current
+	advance(p) // identifier
+	advance(p) // lparen
+
+	args_start := NodeIndex(len(p.extra_data))
+	for peek(p) != .RParen {
+		append(&p.extra_data, parse_expression(p))
+		if peek(p) == .Comma {
+			advance(p)
+		}
+	}
+	args_end := NodeIndex(len(p.extra_data))
+	expect(p, .RParen)
+
+	append(&p.nodes, Node{.CallExpr, token, {args_start, args_end}})
+	return NodeIndex(len(p.nodes) - 1)
+}
+
 print_ast :: proc(p: ^Parser, indent: int = 0) {
 	print_indent :: proc(indent: int) {
 		for _ in 0 ..< indent {
@@ -361,10 +428,28 @@ print_ast :: proc(p: ^Parser, indent: int = 0) {
 		switch node.kind {
 		case .Root:
 			fmt.printf("Root\n")
-			print_node(p, node.data.lhs, indent + 2)
+			first := node.data.lhs
+			last := node.data.rhs
+			for i in first ..= last - 1 {
+				func_index := p.extra_data[i]
+				print_node(p, func_index, indent + 2)
+			}
 		case .FuncDecl:
 			fmt.printf("FuncDecl\n")
+			if node.data.lhs != INVALID_NODE_INDEX {
+				print_node(p, node.data.lhs, indent + 2)
+			}
 			print_node(p, node.data.rhs, indent + 2)
+		case .ParamList:
+			fmt.printf("ParamList\n")
+			first := node.data.lhs
+			last := node.data.rhs
+			for i in first ..< last {
+				param_index := p.extra_data[i]
+				print_node(p, param_index, indent + 2)
+			}
+		case .ParamDecl:
+			fmt.printf("ParamDecl\n")
 		case .BlockStmt:
 			fmt.printf("BlockStmt\n")
 			first := node.data.lhs
@@ -421,6 +506,14 @@ print_ast :: proc(p: ^Parser, indent: int = 0) {
 			fmt.printf("MulExpr\n")
 			print_node(p, node.data.lhs, indent + 2)
 			print_node(p, node.data.rhs, indent + 2)
+		case .CallExpr:
+			fmt.printf("CallExpr\n")
+			first := node.data.lhs
+			last := node.data.rhs
+			for i in first ..= last - 1 {
+				arg_index := p.extra_data[i]
+				print_node(p, arg_index, indent + 2)
+			}
 		case .NegateExpr:
 			fmt.printf("NegateExpr\n")
 		}

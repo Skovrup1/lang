@@ -24,7 +24,8 @@ InstKind :: enum u8 {
 	Alloc,
 	Load,
 	Store,
-	//BigInt, // >32 bit integers
+	Call,
+	Arg,
 }
 
 Inst :: struct {
@@ -44,6 +45,7 @@ Generator :: struct {
 	label_names:  map[InstIndex]string,
 	symbol_table: SymbolTable,
 	label_count:  int,
+	param_count:  int,
 	source:       []u8,
 	tokens:       []lexer.Token,
 	nodes:        []parser.Node,
@@ -66,6 +68,7 @@ make_generator :: proc(
 		extra,
 		label_names,
 		symbol_table,
+		0,
 		0,
 		source,
 		tokens,
@@ -105,7 +108,13 @@ generate :: proc(g: ^Generator) {
 generate_node :: proc(g: ^Generator, node: parser.Node) -> InstIndex {
 	switch node.kind {
 	case .Root:
-		return get_lhs(g, node)
+		first := node.data.lhs
+		last := node.data.rhs
+		for i in first ..< last {
+			func_index := g.extra_data[i]
+			generate_node(g, g.nodes[func_index])
+		}
+		return InstIndex(INVALID_EXTRA_INDEX)
 	case .FuncDecl:
 		label_index := InstIndex(len(g.instructions))
 		append(&g.instructions, Inst{.Label, u32(INVALID_EXTRA_INDEX)})
@@ -113,9 +122,37 @@ generate_node :: proc(g: ^Generator, node: parser.Node) -> InstIndex {
 		name_token := g.tokens[node.main_token]
 		name := cast(string)g.source[name_token.start:name_token.end]
 		g.label_names[label_index] = name
+		add_symbol(g, name, label_index)
 
-		get_rhs(g, node)
+		enter_scope(g)
+		g.param_count = 0
+
+		if node.data.lhs != parser.INVALID_NODE_INDEX {
+			generate_node(g, g.nodes[node.data.lhs])
+		}
+
+		generate_node(g, g.nodes[node.data.rhs])
+		leave_scope(g)
+
 		return label_index
+	case .ParamList:
+		first := node.data.lhs
+		last := node.data.rhs
+		for i in first ..< last {
+			param_index := g.extra_data[i]
+			generate_node(g, g.nodes[param_index])
+		}
+	case .ParamDecl:
+		token := g.tokens[node.main_token]
+		name := cast(string)g.source[token.start:token.end]
+
+		arg_inst := InstIndex(len(g.instructions))
+		append(&g.instructions, Inst{.Arg, u32(g.param_count)})
+		g.param_count += 1
+
+		alloc := InstIndex(len(g.instructions))
+		append(&g.instructions, Inst{.Alloc, u32(arg_inst)})
+		add_symbol(g, name, alloc)
 	case .VarDecl:
 		token := g.tokens[node.main_token]
 		str := cast(string)g.source[token.start:token.end]
@@ -189,7 +226,7 @@ generate_node :: proc(g: ^Generator, node: parser.Node) -> InstIndex {
 		g.label_names[then_label] = new_label(g)
 		generate_node(g, then_node)
 
-		then_is_not_return := g.instructions[len(g.instructions)-1].kind != .Return
+		then_is_not_return := g.instructions[len(g.instructions) - 1].kind != .Return
 		end_jump: InstIndex
 		if then_is_not_return {
 			end_jump = InstIndex(len(g.instructions))
@@ -292,6 +329,29 @@ generate_node :: proc(g: ^Generator, node: parser.Node) -> InstIndex {
 		append(&g.extra, u32(rhs))
 		append(&g.instructions, Inst{.Add, extra_index})
 	case .NegateExpr:
+	case .CallExpr:
+		name_token := g.tokens[node.main_token]
+		name := cast(string)g.source[name_token.start:name_token.end]
+
+		label, ok := find_symbol(g, name)
+		if !ok {
+			panic("could not find function")
+		}
+
+		args_start := node.data.lhs
+		args_end := node.data.rhs
+		args := g.extra_data[args_start:args_end]
+
+		arg_insts := make([dynamic]u32, len(args))
+		for arg, i in args {
+			arg_insts[i] = u32(generate_node(g, g.nodes[arg]))
+		}
+
+		extra_index := u32(len(g.extra))
+		append(&g.extra, u32(label))
+		append(&g.extra, ..arg_insts[:])
+
+		append(&g.instructions, Inst{.Call, extra_index})
 	case .IntLit:
 		token := g.tokens[node.main_token]
 		str := cast(string)g.source[token.start:token.end]
@@ -383,6 +443,28 @@ print :: proc(g: ^Generator) {
 		case .Return:
 			ret_inst := inst.data
 			fmt.printf("    return t%v\n", ret_inst)
+		case .Arg:
+			fmt.printf("    t%v = arg %v\n", i, inst.data)
+		case .Call:
+			extra_index := inst.data
+			label := InstIndex(g.extra[extra_index])
+
+			name, ok := g.label_names[label]
+			if !ok {
+				panic("could not find function name")
+			}
+
+			args_start := extra_index + 1
+			args_end := u32(len(g.extra))
+
+			fmt.printf("    t%v = call %v(", i, name)
+			for arg_index in args_start ..= args_end - 1 {
+				fmt.printf("t%v", g.extra[arg_index])
+				if arg_index != args_end - 1 {
+					fmt.printf(", ")
+				}
+			}
+			fmt.printf(")\n")
 		}
 	}
 }
