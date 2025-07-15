@@ -110,7 +110,7 @@ option :: proc(p: ^Parser, expected: lexer.TokenKind) {
 parse :: proc(p: ^Parser) -> [dynamic]Node {
 	token := p.current
 
-	funcs := make([dynamic]NodeIndex, 0, 1, context.temp_allocator)
+	funcs := make([dynamic]NodeIndex, 0, 1)
 	for peek(p) != .Eof {
 		append(&funcs, parse_function(p))
 	}
@@ -175,7 +175,7 @@ parse_statement :: proc(p: ^Parser) -> NodeIndex {
 	case .LBrace:
 		token := p.current
 		advance(p) // {
-		stmts := make([dynamic]NodeIndex, 0, 1, context.temp_allocator)
+		stmts := make([dynamic]NodeIndex, 0, 1)
 		for peek(p) != .RBrace {
 			append(&stmts, parse_statement(p))
 		}

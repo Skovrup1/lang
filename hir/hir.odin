@@ -138,21 +138,36 @@ generate_node :: proc(g: ^Generator, node: parser.Node) -> InstIndex {
 	case .ParamList:
 		first := node.data.lhs
 		last := node.data.rhs
-		for i in first ..< last {
-			param_index := g.extra_data[i]
-			generate_node(g, g.nodes[param_index])
+
+		length := last - first
+		arg_insts := make([]InstIndex, length)
+		param_names := make([]string, length)
+
+		for i in 0 ..< length {
+			param_index := g.extra_data[i + first]
+			param_node := g.nodes[param_index]
+
+			token := g.tokens[param_node.main_token]
+			name := cast(string)g.source[token.start:token.end]
+			param_names[i] = name
+
+			arg_inst := InstIndex(len(g.instructions))
+			append(&g.instructions, Inst{.Arg, u32(g.param_count)})
+			arg_insts[i] = arg_inst
+			g.param_count += 1
+		}
+
+		for i in 0 ..< length {
+			arg_inst := arg_insts[i]
+			name := param_names[i]
+
+			alloc := InstIndex(len(g.instructions))
+			append(&g.instructions, Inst{.Alloc, u32(arg_inst)})
+			add_symbol(g, name, alloc)
 		}
 	case .ParamDecl:
-		token := g.tokens[node.main_token]
-		name := cast(string)g.source[token.start:token.end]
-
-		arg_inst := InstIndex(len(g.instructions))
-		append(&g.instructions, Inst{.Arg, u32(g.param_count)})
-		g.param_count += 1
-
-		alloc := InstIndex(len(g.instructions))
-		append(&g.instructions, Inst{.Alloc, u32(arg_inst)})
-		add_symbol(g, name, alloc)
+		// intentionally blank, handled by ParamList
+		_ = node
 	case .VarDecl:
 		token := g.tokens[node.main_token]
 		str := cast(string)g.source[token.start:token.end]
@@ -342,7 +357,7 @@ generate_node :: proc(g: ^Generator, node: parser.Node) -> InstIndex {
 		args_end := node.data.rhs
 		args := g.extra_data[args_start:args_end]
 
-		arg_insts := make([dynamic]u32, len(args))
+		arg_insts := make([]u32, len(args))
 		for arg, i in args {
 			arg_insts[i] = u32(generate_node(g, g.nodes[arg]))
 		}

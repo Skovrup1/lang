@@ -8,7 +8,16 @@ import "core:flags"
 import "core:fmt"
 import "core:os"
 
+import vmem "core:mem/virtual"
+
 main :: proc() {
+	arena: vmem.Arena
+	arena_err := vmem.arena_init_growing(&arena)
+	ensure(arena_err == nil)
+	context.allocator = vmem.arena_allocator(&arena)
+	defer free_all(context.allocator)
+	defer free_all(context.temp_allocator)
+
 	Options :: struct {
 		E: bool,
 	}
@@ -65,7 +74,7 @@ main :: proc() {
 	hir.generate(&g)
 	hir.print(&g)
 
-    /*
+	/*
 	for inst in g.instructions {
 		fmt.println(inst)
 	}
