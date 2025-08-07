@@ -1,6 +1,5 @@
 package main
 
-import "hir"
 import "lexer"
 import "parser"
 
@@ -8,11 +7,12 @@ import "core:flags"
 import "core:fmt"
 import "core:os"
 
+import "core:mem"
 import vmem "core:mem/virtual"
 
 main :: proc() {
 	arena: vmem.Arena
-	arena_err := vmem.arena_init_growing(&arena)
+	arena_err := vmem.arena_init_growing(&arena, reserved = mem.Gigabyte)
 	ensure(arena_err == nil)
 	context.allocator = vmem.arena_allocator(&arena)
 	defer free_all(context.allocator)
@@ -60,28 +60,10 @@ main :: proc() {
 	p := parser.make_parser(source, token_list[:])
 	nodes := parser.parse(&p)
 
-	/*
     for node in nodes {
 		fmt.println(node)
 	}
     fmt.println()
-    */
 
 	parser.print_ast(&p)
-
-	g := hir.make_generator(source, token_list[:], nodes[:], p.extra_data[:])
-
-	hir.generate(&g)
-	hir.print(&g)
-
-	/*
-	for inst in g.instructions {
-		fmt.println(inst)
-	}
-	fmt.println()
-    */
-
-	//fmt.println(size_of(lexer.Token))
-	//fmt.println(size_of(parser.Node))
-	//fmt.println(size_of(hir.Inst))
 }

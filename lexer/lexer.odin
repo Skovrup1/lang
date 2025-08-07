@@ -66,6 +66,8 @@ TokenKind :: enum u8 {
 	Else,
 	Struct,
 	I32,
+	Bool,
+	F32,
 	True,
 	False,
 }
@@ -135,7 +137,19 @@ skip_whitespace :: proc(t: ^Tokenizer) {
 identifier_type :: proc(t: ^Tokenizer) -> TokenKind {
 	str := t.source[t.start:t.current]
 
-	keywords := [?]string{"return", "for", "while", "if", "else", "struct", "I32", "true", "false"}
+	keywords := [?]string {
+		"return",
+		"for",
+		"while",
+		"if",
+		"else",
+		"struct",
+		"I32",
+		"Bool",
+		"F32",
+		"true",
+		"false",
+	}
 
 	for _, i in keywords {
 		if keywords[i] == transmute(string)str {
